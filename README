@@ -1,0 +1,5 @@
+Socket server for management game.
+
+For more information see http://www.stolyarov.info/books/pdf/gameserv.pdf .
+
+Used buffer.[ch] from https://github.com/Totktonada/shell .
