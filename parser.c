@@ -28,8 +28,7 @@ int parser_get_lex (parser_info *pinfo)
     pinfo->cur_lex = get_lex (&(pinfo->linfo));
 
     if (pinfo->cur_lex == NULL) {
-        /* Request for new data */
-        return 0;
+        return 0; /* Request for new data */
     }
 
     return 1;
@@ -248,8 +247,7 @@ command *get_cmd (parser_info *pinfo)
             if (parser_get_lex (pinfo)) {
                 pinfo->request_for_lex = 0;
             } else {
-                /* Request for new data */
-                return NULL;
+                return NULL; /* Request for new data */
             }
         }
 
