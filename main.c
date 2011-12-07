@@ -1,22 +1,21 @@
 #include "main.h"
 
-/* On success returns descriptor
- * of listening socket.
+/* On success set sinfo->listening_socket
+ * to proper value.
  * Exit on failure. */
-int get_listening_socket ()
+void get_listening_socket (server_info *sinfo)
 {
-    int listening_socket;
     struct sockaddr_in addr;
     int so_reuseaddr_value = 1;
 
-    listening_socket = socket (AF_INET, SOCK_STREAM, 0);
-    if (SOCKET_ERROR (listening_socket)) {
+    sinfo->listening_socket = socket (AF_INET, SOCK_STREAM, 0);
+    if (SOCKET_ERROR (sinfo->listening_socket)) {
         perror ("socket ()");
         exit (ES_SYSCALL_FAILED);
     }
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons (LISTENING_PORT);
+    addr.sin_port = htons (sinfo->listening_port);
     /* addr.sin_addr.s_addr = INADDR_ANY; */
     if (INET_ATON_ERROR (
             inet_aton ("127.0.0.1", &(addr.sin_addr))))
@@ -25,7 +24,7 @@ int get_listening_socket ()
         exit (ES_SYSCALL_FAILED);
     }
 
-    if (SETSOCKOPT (setsockopt (listening_socket,
+    if (SETSOCKOPT (setsockopt (sinfo->listening_socket,
             SOL_SOCKET, SO_REUSEADDR, &so_reuseaddr_value,
             sizeof (so_reuseaddr_value))))
     {
@@ -33,19 +32,17 @@ int get_listening_socket ()
         exit (ES_SYSCALL_FAILED);
     }
 
-    if (BIND_ERROR (bind (listening_socket,
+    if (BIND_ERROR (bind (sinfo->listening_socket,
             (struct sockaddr *) &addr, sizeof (addr))))
     {
         perror ("bind ()");
         exit (ES_SYSCALL_FAILED);
     }
 
-    if (LISTEN_ERROR (listen (listening_socket, 5))) {
+    if (LISTEN_ERROR (listen (sinfo->listening_socket, 5))) {
         perror ("listen ()");
         exit (ES_SYSCALL_FAILED);
     }
-
-    return listening_socket;
 }
 
 void update_max_fd (server_info *sinfo)
@@ -77,9 +74,9 @@ client_info *new_client_info (int client_socket)
 
 /* Get listening socket and put it to read_fds.
  * Note: no malloc */
-void new_server_info (server_info *sinfo)
+void init_server_info (server_info *sinfo)
 {
-    sinfo->listening_socket = get_listening_socket ();
+    get_listening_socket (sinfo);
     FD_ZERO (&(sinfo->read_fds));
     FD_SET (sinfo->listening_socket, &(sinfo->read_fds));
     sinfo->first_client = NULL;
@@ -271,6 +268,9 @@ int main (int argc, char **argv, char **envp)
     int select_value;
     fd_set ready_fds;
 
+    sinfo.listening_port = DEFAULT_LISTENING_PORT;
+    process_cmd_line_parameters (&sinfo, argv + 1);
+
 #ifdef DAEMON
     printf ("Fork to background...\n");
 #ifdef DAEMON_ALT
@@ -280,7 +280,7 @@ int main (int argc, char **argv, char **envp)
 #endif
 #endif
 
-    new_server_info (&sinfo);
+    init_server_info (&sinfo);
 
     do {
         ready_fds = sinfo.read_fds;

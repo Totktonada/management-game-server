@@ -1,4 +1,4 @@
-SRCMODULES = buffer.c lexer.c parser.c runner.c main.c
+SRCMODULES = buffer.c lexer.c parser.c runner.c parameters.c main.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 HEADERS = $(SRCMODULES:.c=.h)
 EXEC_FILE = management-game-server

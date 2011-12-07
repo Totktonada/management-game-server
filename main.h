@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define LISTENING_PORT 37187
+#define DEFAULT_LISTENING_PORT 37187
 #define READ_BUFFER_SIZE 1024
 
 #include "parser.h"
@@ -52,6 +52,7 @@ typedef struct client_info {
 } client_info;
 
 typedef struct server_info {
+    int listening_port;
     int listening_socket;
     fd_set read_fds;
     int max_fd;
@@ -59,5 +60,7 @@ typedef struct server_info {
     client_info *last_client;
     game_data gdata;
 } server_info;
+
+#include "parameters.h"
 
 #endif
