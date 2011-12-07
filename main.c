@@ -107,6 +107,8 @@ void process_new_client (server_info *sinfo, int listening_socket)
             new_client_info (client_socket);
     }
 
+    ++sinfo->gdata.clients_count;
+
     FD_SET (client_socket, &(sinfo->read_fds));
     if (sinfo->max_fd < client_socket) {
         sinfo->max_fd = client_socket;
@@ -132,6 +134,7 @@ void unregister_client (server_info *sinfo, client_info *client)
             if (cur_c == sinfo->last_client)
                 sinfo->last_client = prev_c;
 
+            --sinfo->gdata.clients_count;
             break;
         }
 

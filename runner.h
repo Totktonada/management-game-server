@@ -9,6 +9,7 @@
 
 typedef struct game_data {
     unsigned int counter;
+    unsigned int clients_count;
 } game_data;
 
 void new_game_data (game_data *gdata);

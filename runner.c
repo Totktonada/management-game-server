@@ -3,6 +3,7 @@
 void new_game_data (game_data *gdata)
 {
     gdata->counter = 0;
+    gdata->clients_count = 0;
 }
 
 #ifndef DAEMON
@@ -40,11 +41,10 @@ void do_cmd_incr (game_data *gdata, int write_fd)
     ++gdata->counter;
 }
 
-void do_cmd_show (game_data *gdata, int write_fd)
+void write_number (int write_fd, unsigned int number)
 {
-    /* (2^32-1) contain 10 symbols plus '\n'. */
-    char *buf = (char *) malloc (11 * sizeof (char));
-    unsigned int number = gdata->counter;
+    /* (2^32-1) contain 10 symbols. */
+    char *buf = (char *) malloc (10 * sizeof (char));
     unsigned int i = 0;
     unsigned int del = 1;
 
@@ -53,7 +53,6 @@ void do_cmd_show (game_data *gdata, int write_fd)
         ++i;
     }
 
-    buf[i + 1] = '\n';
     i = 0;
 
     do {
@@ -62,8 +61,20 @@ void do_cmd_show (game_data *gdata, int write_fd)
         ++i;
     } while (del > 0);
 
-    write (write_fd, buf, i + 1);
+    write (write_fd, buf, i);
     free (buf);
+}
+
+void do_cmd_show (game_data *gdata, int write_fd)
+{
+    char msg1[] = "Clients count: ";
+    char msg2[] = "\nCounter: ";
+    char msg3[] = "\n";
+    write (write_fd, msg1, sizeof (msg1) - 1);
+    write_number (write_fd, gdata->clients_count);
+    write (write_fd, msg2, sizeof (msg2) - 1);
+    write_number (write_fd, gdata->counter);
+    write (write_fd, msg3, sizeof (msg3) - 1);
 }
 
 void do_cmd_wrong (int write_fd)
