@@ -51,6 +51,7 @@ typedef struct parser_info {
     lexeme *cur_lex;
     command tmp_cmd;
     unsigned int request_for_lex:1;
+    unsigned int cur_lex_data_used:1;
 } parser_info;
 
 void new_parser_info (parser_info *pinfo);

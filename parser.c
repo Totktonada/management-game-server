@@ -7,6 +7,7 @@ void new_parser_info (parser_info *pinfo)
     pinfo->cur_lex = NULL;
     /* pinfo->tmp_cmd is undefined. */
     pinfo->request_for_lex = 1;
+    pinfo->cur_lex_data_used = 0;
 }
 
 void put_new_data_to_parser (parser_info *pinfo,
@@ -21,6 +22,9 @@ void put_new_data_to_parser (parser_info *pinfo,
  * 0, otherwise. */
 int parser_get_lex (parser_info *pinfo)
 {
+    if (pinfo->cur_lex != NULL)
+        destroy_lex (pinfo->cur_lex, ! pinfo->cur_lex_data_used);
+
     pinfo->cur_lex = get_lex (&(pinfo->linfo));
 
     if (pinfo->cur_lex == NULL) {
@@ -173,6 +177,7 @@ command *p_st_expect_optional_str (parser_info *pinfo)
     switch (pinfo->cur_lex->type) {
     case LEX_WORD:
         pinfo->tmp_cmd.value = pinfo->cur_lex->value;
+        pinfo->cur_lex_data_used = 1;
         pinfo->request_for_lex = 1;
         pinfo->state = P_ST_PROCESS_ARG2;
         break;
@@ -287,4 +292,15 @@ command *get_cmd (parser_info *pinfo)
 
 void destroy_cmd (command *cmd)
 {
+    switch (cmd->type) {
+    case CMD_HELP:
+    case CMD_NICK:
+        if (cmd->value.str != NULL)
+            free (cmd->value.str);
+        break;
+    default:
+        break; /* For avoid compile error. */
+    }
+
+    free (cmd);
 }

@@ -49,6 +49,6 @@ void new_lexer_info (lexer_info *linfo);
 void put_new_data_to_lexer (lexer_info *linfo,
     char *read_buffer, int read_available);
 lexeme *get_lex (lexer_info *linfo);
-void destroy_lex (lexeme *lex);
+void destroy_lex (lexeme *lex, int free_data);
 
 #endif

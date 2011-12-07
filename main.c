@@ -185,6 +185,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
         print_cmd (cmd);
 #endif
         execute_cmd (&(sinfo->gdata), client->fd, cmd);
+        destroy_cmd (cmd);
     } while (1);
 }
 

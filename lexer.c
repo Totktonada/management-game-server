@@ -21,7 +21,8 @@ void put_new_data_to_lexer (lexer_info *linfo,
  * If (type == LEX_NUMBER) and number processing
  * failed returns lexeme with LEX_WRONG_NUMBER type.
  * Returns LEX_WRONG_NUMBER possible,
- * if type argument is LEX_NUMBER or LEX_WRONG_NUMBER. */
+ * if type argument is LEX_NUMBER or LEX_WRONG_NUMBER.
+ * This function clear buffer if type is LEX_WORD or LEX_NUMBER. */
 lexeme *new_lex (type_of_lex type, buffer *buf)
 {
     lexeme *lex = (lexeme *) malloc (sizeof (lexeme));
@@ -73,10 +74,14 @@ int get_char (lexer_info *linfo)
     return 1;
 }
 
-void destroy_lex (lexeme *lex)
+void destroy_lex (lexeme *lex, int free_data)
 {
-    if (lex->type == LEX_WORD && lex->value.str != NULL)
+    if (free_data
+        && lex->type == LEX_WORD
+        && lex->value.str != NULL)
+    {
         free (lex->value.str);
+    }
     free (lex);
 }
 
@@ -107,6 +112,7 @@ lexeme *st_word (lexer_info *linfo)
 
     if (linfo->c == '\n') {
         linfo->state = ST_PROTOCOL_PARSE_ERROR;
+        clear_buffer (&(linfo->buf));
     } else if (isblank (linfo->c) || linfo->c == '\r') {
         /* ' ', '\t', '\r' */
         linfo->state = ST_START;
@@ -125,6 +131,7 @@ lexeme *st_number (lexer_info *linfo)
 
     if (linfo->c == '\n') {
         linfo->state = ST_PROTOCOL_PARSE_ERROR;
+        clear_buffer (&(linfo->buf));
     } else if (isblank (linfo->c) || linfo->c == '\r') {
         /* ' ', '\t', '\r' */
         linfo->state = ST_START;
