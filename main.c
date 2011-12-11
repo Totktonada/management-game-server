@@ -157,7 +157,7 @@ void client_disconnect (server_info *sinfo, client_info *client)
         exit (ES_SYSCALL_FAILED);
     }
     if (CLOSE_ERROR (close (client->fd))) {
-        perror ("shutdown ()");
+        perror ("close ()");
         exit (ES_SYSCALL_FAILED);
     }
 }
