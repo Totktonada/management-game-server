@@ -176,8 +176,8 @@ void process_readed_data (server_info *sinfo, client_info *client)
             break;
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
             /* TODO: tell user about disconnect reason. */
-            client_disconnect (sinfo, client);
             unregister_client (sinfo, client);
+            client_disconnect (sinfo, client);
             free (client);
             break;
         }
@@ -209,8 +209,8 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
             perror ("read ()");
             exit (ES_SYSCALL_FAILED);
         } else if (READ_EOF (read_value)) {
-            client_disconnect (sinfo, cur_c);
             unregister_client (sinfo, cur_c);
+            client_disconnect (sinfo, cur_c);
             free (cur_c);
         } else {
             cur_c->read_available = read_value;
