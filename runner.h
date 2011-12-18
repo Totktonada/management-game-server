@@ -6,9 +6,9 @@
 #endif
 #include <unistd.h>
 #include "parser.h"
+#include "utils.h"
 
 typedef struct game_data {
-    unsigned int counter;
     unsigned int clients_count;
 } game_data;
 

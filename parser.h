@@ -7,29 +7,24 @@
 #endif
 #include "lexer.h"
 
-/* Case insensitive */
-#define STR_EQUAL_CASE_INS(str1, str2) (strcasecmp ((str1), (str2)) == 0)
-
 typedef enum type_of_cmd {
-    CMD_EMPTY, /* '\n' */
-    CMD_HELP,  /* help [command] */
-    CMD_NICK,  /* nick [string] */
-    CMD_INCR,  /* incr */
-    CMD_SHOW,  /* show */
+    CMD_EMPTY,  /* '\n' */
+    CMD_HELP,   /* help [command] */
+    CMD_NICK,   /* nick [string] */
+    CMD_STATUS, /* status [username] */
+    CMD_PROD,   /* prod amount cost */
+    CMD_BUY,    /* buy amount cost */
+    CMD_SELL,   /* sell amount cost */
+    CMD_BUILD,  /* build */
+    CMD_TURN,   /* turn */
     CMD_WRONG,
     CMD_PROTOCOL_PARSE_ERROR
 } type_of_cmd;
 
-#if 0 /* equal to value_of_lex */
-typedef union value_of_cmd {
-    int number;
-    char *str;
-} value_of_cmd;
-#endif
-
 typedef struct command {
     type_of_cmd type;
     value_of_lex value;
+    value_of_lex value2;
 } command;
 
 typedef enum parser_state {
@@ -39,6 +34,8 @@ typedef enum parser_state {
     P_ST_EXPECT_CMD_NAME,
     P_ST_EXPECT_EOLN,
     P_ST_EXPECT_OPTIONAL_STR,
+    P_ST_EXPECT_TWO_NUMBERS,
+    P_ST_EXPECT_ONE_NUMBER,
     P_ST_WRONG,
     P_ST_EMPTY,
     P_ST_SKIP,
@@ -53,6 +50,8 @@ typedef struct parser_info {
     unsigned int request_for_lex:1;
     unsigned int cur_lex_data_used:1;
 } parser_info;
+
+#include "utils.h"
 
 void new_parser_info (parser_info *pinfo);
 void put_new_data_to_parser (parser_info *pinfo,

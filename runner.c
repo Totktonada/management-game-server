@@ -2,7 +2,6 @@
 
 void new_game_data (game_data *gdata)
 {
-    gdata->counter = 0;
     gdata->clients_count = 0;
 }
 
@@ -13,20 +12,32 @@ void print_cmd (command *cmd)
     case CMD_EMPTY:
         printf ("[CMD_EMPTY]\n");
         break;
-    case CMD_WRONG:
-        printf ("[CMD_WRONG]\n");
+    case CMD_HELP:
+        printf ("[CMD_HELP]\n");
         break;
     case CMD_NICK:
         printf ("[CMD_NICK]\n");
         break;
-    case CMD_INCR:
-        printf ("[CMD_INCR]\n");
+    case CMD_STATUS:
+        printf ("[CMD_STATUS]\n");
         break;
-    case CMD_SHOW:
-        printf ("[CMD_SHOW]\n");
+    case CMD_PROD:
+        printf ("[CMD_PROD]\n");
         break;
-    case CMD_HELP:
-        printf ("[CMD_HELP]\n");
+    case CMD_BUY:
+        printf ("[CMD_BUY]\n");
+        break;
+    case CMD_SELL:
+        printf ("[CMD_SELL]\n");
+        break;
+    case CMD_BUILD:
+        printf ("[CMD_BUILD]\n");
+        break;
+    case CMD_TURN:
+        printf ("[CMD_TURN]\n");
+        break;
+    case CMD_WRONG:
+        printf ("[CMD_WRONG]\n");
         break;
     case CMD_PROTOCOL_PARSE_ERROR:
         /* Not possible */
@@ -36,9 +47,65 @@ void print_cmd (command *cmd)
 }
 #endif
 
-void do_cmd_incr (game_data *gdata, int write_fd)
+void do_cmd_help (int write_fd, char *cmd_name)
 {
-    ++gdata->counter;
+    const char buf_without_cmd[] = "\
+Available commands:\n\
+* help [command]\n\
+* nick [string]\n\
+* status [username]\n\
+* prod amount cost\n\
+* buy amount cost\n\
+* sell amount cost\n\
+* build\n\
+* turn\n\
+Command parser is case insensitive and have fun,\
+ when you type commands in uppercase.\n\
+";
+    const char buf_cmd_help[] = "\
+help [command]\n\
+If have not argument, print available commands.\
+ If argument is command name, print short help\
+ about this command.\n\
+";
+    const char buf_unknown_cmd[] = "\
+Wrong argument: typed command not found.\n\
+";
+    if (cmd_name == NULL) {
+        write (write_fd, buf_without_cmd,
+            sizeof (buf_without_cmd) - 1);
+        return;
+    }
+
+    /* TODO */
+    switch (get_cmd_type (cmd_name)) {
+    case CMD_HELP:
+        write (write_fd, buf_cmd_help,
+            sizeof (buf_cmd_help) - 1);
+        break;
+    case CMD_NICK:
+        break;
+    case CMD_STATUS:
+        break;
+    case CMD_PROD:
+        break;
+    case CMD_BUY:
+        break;
+    case CMD_SELL:
+        break;
+    case CMD_BUILD:
+        break;
+    case CMD_TURN:
+        break;
+    case CMD_WRONG:
+        write (write_fd, buf_unknown_cmd,
+            sizeof (buf_unknown_cmd) - 1);
+        break;
+    case CMD_EMPTY:
+    case CMD_PROTOCOL_PARSE_ERROR:
+        /* Not possible */
+        break;
+    }
 }
 
 void write_number (int write_fd, unsigned int number)
@@ -65,16 +132,50 @@ void write_number (int write_fd, unsigned int number)
     free (buf);
 }
 
-void do_cmd_show (game_data *gdata, int write_fd)
+void do_cmd_status (game_data *gdata, int write_fd,
+    char *username)
 {
-    char msg1[] = "Clients count: ";
-    char msg2[] = "\nCounter: ";
-    char msg3[] = "\n";
-    write (write_fd, msg1, sizeof (msg1) - 1);
-    write_number (write_fd, gdata->clients_count);
-    write (write_fd, msg2, sizeof (msg2) - 1);
-    write_number (write_fd, gdata->counter);
-    write (write_fd, msg3, sizeof (msg3) - 1);
+    char msg_cl_count[] = "Clients count: ";
+    char msg_newline[] = "\n";
+
+    if (username == NULL) {
+        write (write_fd, msg_cl_count,
+            sizeof (msg_cl_count) - 1);
+        write_number (write_fd, gdata->clients_count);
+        write (write_fd, msg_newline,
+            sizeof (msg_newline) - 1);
+        return;
+    }
+
+    /* TODO */
+}
+
+void do_cmd_prod (game_data *gdata, int write_fd,
+    int amount, int cost)
+{
+    /* TODO */
+}
+
+void do_cmd_buy (game_data *gdata, int write_fd,
+    int amount, int cost)
+{
+    /* TODO */
+}
+
+void do_cmd_sell (game_data *gdata, int write_fd,
+    int amount, int cost)
+{
+    /* TODO */
+}
+
+void do_cmd_build (game_data *gdata, int write_fd)
+{
+    /* TODO */
+}
+
+void do_cmd_turn (game_data *gdata, int write_fd)
+{
+    /* TODO */
 }
 
 void do_cmd_wrong (int write_fd)
@@ -93,14 +194,30 @@ void execute_cmd (game_data *gdata, int write_fd,
         /* Do nothing. */
         break;
     case CMD_HELP:
+        do_cmd_help (write_fd, cmd->value.str);
         break;
     case CMD_NICK:
         break;
-    case CMD_INCR:
-        do_cmd_incr (gdata, write_fd);
+    case CMD_STATUS:
+        do_cmd_status (gdata, write_fd, cmd->value.str);
         break;
-    case CMD_SHOW:
-        do_cmd_show (gdata, write_fd);
+    case CMD_PROD:
+        do_cmd_prod (gdata, write_fd,
+            cmd->value.number, cmd->value2.number);
+        break;
+    case CMD_BUY:
+        do_cmd_buy (gdata, write_fd,
+            cmd->value.number, cmd->value2.number);
+        break;
+    case CMD_SELL:
+        do_cmd_sell (gdata, write_fd,
+            cmd->value.number, cmd->value2.number);
+        break;
+    case CMD_BUILD:
+        do_cmd_build (gdata, write_fd);
+        break;
+    case CMD_TURN:
+        do_cmd_turn (gdata, write_fd);
         break;
     case CMD_WRONG:
         do_cmd_wrong (write_fd);

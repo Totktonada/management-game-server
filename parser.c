@@ -41,6 +41,7 @@ command *new_cmd (parser_info *pinfo)
 
     cmd->type = pinfo->tmp_cmd.type;
     cmd->value = pinfo->tmp_cmd.value;
+    cmd->value2 = pinfo->tmp_cmd.value2;
 
     return cmd;
 }
@@ -70,15 +71,22 @@ command *p_st_process_arg1 (parser_info *pinfo)
 {
     switch (pinfo->tmp_cmd.type) {
     /* Commands without arguments. */
-    case CMD_INCR:
-    case CMD_SHOW:
+    case CMD_BUILD:
+    case CMD_TURN:
         pinfo->state = P_ST_EXPECT_EOLN;
         break;
 
     /* Commands with optional str argument. */
     case CMD_HELP:
     case CMD_NICK:
+    case CMD_STATUS:
         pinfo->state = P_ST_EXPECT_OPTIONAL_STR;
+        break;
+
+    case CMD_PROD:
+    case CMD_BUY:
+    case CMD_SELL:
+        pinfo->state = P_ST_EXPECT_TWO_NUMBERS;
         break;
 
     /* Not possible */
@@ -99,7 +107,14 @@ command *p_st_process_arg2 (parser_info *pinfo)
      * We already process one argument. */
     case CMD_HELP:
     case CMD_NICK:
+    case CMD_STATUS:
         pinfo->state = P_ST_EXPECT_EOLN;
+        break;
+
+    case CMD_PROD:
+    case CMD_BUY:
+    case CMD_SELL:
+        pinfo->state = P_ST_EXPECT_ONE_NUMBER;
         break;
 
     /* Not possible */
@@ -115,32 +130,12 @@ command *p_st_process_arg2 (parser_info *pinfo)
 
 command *p_st_expect_cmd_name (parser_info *pinfo)
 {
-    /* TODO: make it more pretty */
-    if (STR_EQUAL_CASE_INS (
-        pinfo->cur_lex->value.str, "nick"))
-    {
-        pinfo->tmp_cmd.type = CMD_NICK;
-        pinfo->request_for_lex = 1;
-        pinfo->state = P_ST_PROCESS_ARG1;
-    } else if (STR_EQUAL_CASE_INS (
-        pinfo->cur_lex->value.str, "incr"))
-    {
-        pinfo->tmp_cmd.type = CMD_INCR;
-        pinfo->request_for_lex = 1;
-        pinfo->state = P_ST_PROCESS_ARG1;
-    } else if (STR_EQUAL_CASE_INS (
-        pinfo->cur_lex->value.str, "show"))
-    {
-        pinfo->tmp_cmd.type = CMD_SHOW;
-        pinfo->request_for_lex = 1;
-        pinfo->state = P_ST_PROCESS_ARG1;
-    } else if (STR_EQUAL_CASE_INS (
-        pinfo->cur_lex->value.str, "help"))
-    {
-        pinfo->tmp_cmd.type = CMD_HELP;
-        pinfo->request_for_lex = 1;
-        pinfo->state = P_ST_PROCESS_ARG1;
-    } else {
+    pinfo->request_for_lex = 1;
+    pinfo->state = P_ST_PROCESS_ARG1;
+    pinfo->tmp_cmd.type = get_cmd_type (pinfo->cur_lex->value.str);
+
+    if (pinfo->tmp_cmd.type == CMD_WRONG) {
+        pinfo->request_for_lex = 0;
         pinfo->state = P_ST_WRONG;
     }
 
@@ -195,6 +190,46 @@ command *p_st_expect_optional_str (parser_info *pinfo)
     }
 
     return cmd;
+}
+
+command *p_st_expect_two_numbers (parser_info *pinfo)
+{
+    switch (pinfo->cur_lex->type) {
+    case LEX_NUMBER:
+        pinfo->tmp_cmd.value = pinfo->cur_lex->value;
+        pinfo->request_for_lex = 1;
+        pinfo->state = P_ST_PROCESS_ARG2;
+        break;
+    case LEX_PROTOCOL_PARSE_ERROR:
+        pinfo->state = P_ST_PROTOCOL_PARSE_ERROR;
+        break;
+    case LEX_WORD:
+    case LEX_EOLN:
+    default:
+        pinfo->state = P_ST_WRONG;
+    }
+
+    return NULL;
+}
+
+command *p_st_expect_one_number (parser_info *pinfo)
+{
+    switch (pinfo->cur_lex->type) {
+    case LEX_NUMBER:
+        pinfo->tmp_cmd.value2 = pinfo->cur_lex->value;
+        pinfo->request_for_lex = 1;
+        pinfo->state = P_ST_EXPECT_EOLN;
+        break;
+    case LEX_PROTOCOL_PARSE_ERROR:
+        pinfo->state = P_ST_PROTOCOL_PARSE_ERROR;
+        break;
+    case LEX_WORD:
+    case LEX_EOLN:
+    default:
+        pinfo->state = P_ST_WRONG;
+    }
+
+    return NULL;
 }
 
 command *p_st_wrong (parser_info *pinfo)
@@ -270,6 +305,12 @@ command *get_cmd (parser_info *pinfo)
         case P_ST_EXPECT_OPTIONAL_STR:
             cmd = p_st_expect_optional_str (pinfo);
             break;
+        case P_ST_EXPECT_TWO_NUMBERS:
+            cmd = p_st_expect_two_numbers (pinfo);
+            break;
+        case P_ST_EXPECT_ONE_NUMBER:
+            cmd = p_st_expect_one_number (pinfo);
+            break;
         case P_ST_WRONG:
             cmd = p_st_wrong (pinfo);
             break;
@@ -293,6 +334,7 @@ void destroy_cmd (command *cmd)
     switch (cmd->type) {
     case CMD_HELP:
     case CMD_NICK:
+    case CMD_STATUS:
         if (cmd->value.str != NULL)
             free (cmd->value.str);
         break;
