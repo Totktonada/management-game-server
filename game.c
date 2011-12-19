@@ -1,4 +1,4 @@
-#include "runner.h"
+#include "game.h"
 
 void new_game_data (game_data *gdata)
 {

@@ -1,5 +1,5 @@
-#ifndef RUNNER_H_SENTRY
-#define RUNNER_H_SENTRY
+#ifndef GAME_H_SENTRY
+#define GAME_H_SENTRY
 
 #ifndef DAEMON
 #include <stdio.h>

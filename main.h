@@ -20,7 +20,7 @@
 #define READ_BUFFER_SIZE 1024
 
 #include "parser.h"
-#include "runner.h"
+#include "game.h"
 #include "utils.h"
 
 /* Exit status, if one of next system calls failed:
