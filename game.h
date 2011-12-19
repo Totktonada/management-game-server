@@ -5,6 +5,7 @@
 #include <stdio.h>
 #endif
 #include <unistd.h>
+#include <string.h>
 #include "parser.h"
 #include "utils.h"
 

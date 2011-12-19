@@ -139,7 +139,7 @@ void do_cmd_nick (user_game_data *user_gdata, int write_fd,
         write (write_fd, msg_your_nickname,
             sizeof (msg_your_nickname) - 1);
         write (write_fd, user_gdata->nick,
-            sizeof (user_gdata->nick)); /* TODO: fix size. */
+            strlen (user_gdata->nick));
         write (write_fd, msg_newline,
             sizeof (msg_newline) - 1);
         return;
