@@ -1,5 +1,36 @@
 #include "main.h"
 
+char *first_vacant_nick (client_info *first_client)
+{
+    /* See comment to number_to_str ().
+     * First position reserved for 'p' symbol. */
+    char *buf = (char *) malloc (12 * sizeof (char));
+    client_info *cur_c;
+    int nick_number = -1;
+    int nick_found;
+
+    *buf = 'p';
+
+    do {
+        ++nick_number;
+        nick_found = 0;
+        cur_c = first_client;
+        number_to_str (buf + 1, nick_number);
+
+        while (cur_c != NULL && !nick_found) {
+            if (cur_c->user_gdata.nick == NULL) {
+                nick_found = 0;
+            } else {
+                nick_found = STR_EQUAL (buf,
+                    cur_c->user_gdata.nick);
+            }
+            cur_c = cur_c->next;
+        }
+    } while (nick_found);
+
+    return buf;
+}
+
 /* On success set sinfo->listening_socket
  * to proper value.
  * Exit on failure. */
@@ -68,6 +99,7 @@ client_info *new_client_info (int client_socket)
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info (&(client->pinfo));
+    new_user_game_data (&(client->user_gdata));
     client->next = NULL;
     return client;
 }
@@ -104,7 +136,9 @@ void process_new_client (server_info *sinfo, int listening_socket)
             new_client_info (client_socket);
     }
 
-    ++sinfo->gdata.clients_count;
+    ++sinfo->gdata.users_count;
+    sinfo->last_client->user_gdata.nick =
+        first_vacant_nick (sinfo->first_client);
 
     FD_SET (client_socket, &(sinfo->read_fds));
     if (sinfo->max_fd < client_socket) {
@@ -131,7 +165,7 @@ void unregister_client (server_info *sinfo, client_info *client)
             if (cur_c == sinfo->last_client)
                 sinfo->last_client = prev_c;
 
-            --sinfo->gdata.clients_count;
+            --sinfo->gdata.users_count;
             break;
         }
 
@@ -184,7 +218,9 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #ifndef DAEMON
         print_cmd (cmd);
 #endif
-        execute_cmd (&(sinfo->gdata), client->fd, cmd);
+        execute_cmd (&(sinfo->gdata),
+            &(client->user_gdata),
+            client->fd, cmd);
         destroy_cmd (cmd);
     } while (1);
 }

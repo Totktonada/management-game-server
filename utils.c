@@ -22,3 +22,32 @@ type_of_cmd get_cmd_type (char *str)
         return CMD_WRONG;
     }
 }
+
+/* Symbols write to buf from 0 position.
+ * In end write '\0'.
+ * (2^32-1) contain 10 symbols,
+ * therefore for unsigned int range buf must
+ * have size 11.
+ * Returns:
+ * size of string without '\0'. */
+int number_to_str (char *buf, int number)
+{
+    unsigned int i = 0;
+    unsigned int del = 1;
+
+    while (number / 10 >= del) {
+        del *= 10;
+        ++i;
+    }
+
+    i = 0;
+
+    do {
+        buf[i] = '0' + ((number / del) % 10);
+        del /= 10;
+        ++i;
+    } while (del > 0);
+
+    buf[i] = '\0';
+    return i;
+}

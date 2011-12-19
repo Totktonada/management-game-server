@@ -21,6 +21,7 @@
 
 #include "parser.h"
 #include "runner.h"
+#include "utils.h"
 
 /* Exit status, if one of next system calls failed:
  * fork/socket/inet_aton/bind/listen/select/accept. */
@@ -48,6 +49,7 @@ typedef struct client_info {
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
     parser_info pinfo;
+    user_game_data user_gdata;
     struct client_info *next;
 } client_info;
 

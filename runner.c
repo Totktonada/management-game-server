@@ -2,7 +2,19 @@
 
 void new_game_data (game_data *gdata)
 {
-    gdata->clients_count = 0;
+    gdata->users_count = 0;
+    gdata->state = G_ST_WAIT_USERS;
+    gdata->step = 0;
+}
+
+void new_user_game_data (user_game_data *user_gdata)
+{
+    user_gdata->nick = NULL; /* See process_new_client ()
+        in "main.c". NULL for ignore in first_vacant_nick (). */
+    user_gdata->money = 10000;
+    user_gdata->raw_count = 4;
+    user_gdata->prod_count = 2;
+    user_gdata->factory_count = 2;
 }
 
 #ifndef DAEMON
@@ -46,6 +58,15 @@ void print_cmd (command *cmd)
     }
 }
 #endif
+
+void write_number (int write_fd, unsigned int number)
+{
+    /* See comment to number_to_str (). */
+    char *buf = (char *) malloc (11 * sizeof (char));
+    int size = number_to_str (buf, number);
+    write (write_fd, buf, size);
+    free (buf);
+}
 
 void do_cmd_help (int write_fd, char *cmd_name)
 {
@@ -108,40 +129,36 @@ Wrong argument: typed command not found.\n\
     }
 }
 
-void write_number (int write_fd, unsigned int number)
+void do_cmd_nick (user_game_data *user_gdata, int write_fd,
+    char *nick)
 {
-    /* (2^32-1) contain 10 symbols. */
-    char *buf = (char *) malloc (10 * sizeof (char));
-    unsigned int i = 0;
-    unsigned int del = 1;
+    char msg_your_nickname[] = "Your nickname: ";
+    char msg_newline[] = "\n";
 
-    while (number / 10 >= del) {
-        del *= 10;
-        ++i;
+    if (nick == NULL) {
+        write (write_fd, msg_your_nickname,
+            sizeof (msg_your_nickname) - 1);
+        write (write_fd, user_gdata->nick,
+            sizeof (user_gdata->nick)); /* TODO: fix size. */
+        write (write_fd, msg_newline,
+            sizeof (msg_newline) - 1);
+        return;
     }
 
-    i = 0;
-
-    do {
-        buf[i] = '0' + ((number / del) % 10);
-        del /= 10;
-        ++i;
-    } while (del > 0);
-
-    write (write_fd, buf, i);
-    free (buf);
+    /* TODO */
 }
 
+/* TODO: nick -> username ? */
 void do_cmd_status (game_data *gdata, int write_fd,
-    char *username)
+    char *nick)
 {
     char msg_cl_count[] = "Clients count: ";
     char msg_newline[] = "\n";
 
-    if (username == NULL) {
+    if (nick == NULL) {
         write (write_fd, msg_cl_count,
             sizeof (msg_cl_count) - 1);
-        write_number (write_fd, gdata->clients_count);
+        write_number (write_fd, gdata->users_count);
         write (write_fd, msg_newline,
             sizeof (msg_newline) - 1);
         return;
@@ -186,8 +203,9 @@ Wrong command. Try \"help\".\n";
     write (write_fd, buf, sizeof (buf) - 1);
 }
 
-void execute_cmd (game_data *gdata, int write_fd,
-    command *cmd)
+void execute_cmd (game_data *gdata,
+    user_game_data *user_gdata,
+    int write_fd, command *cmd)
 {
     switch (cmd->type) {
     case CMD_EMPTY:
@@ -197,6 +215,7 @@ void execute_cmd (game_data *gdata, int write_fd,
         do_cmd_help (write_fd, cmd->value.str);
         break;
     case CMD_NICK:
+        do_cmd_nick (user_gdata, write_fd, cmd->value.str);
         break;
     case CMD_STATUS:
         do_cmd_status (gdata, write_fd, cmd->value.str);
