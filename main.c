@@ -6,13 +6,12 @@ char *first_vacant_nick (client_info *first_client)
      * First position reserved for 'p' symbol. */
     char *buf = (char *) malloc (12 * sizeof (char));
     client_info *cur_c;
-    int nick_number = -1;
+    int nick_number = 0;
     int nick_found;
 
     *buf = 'p';
 
     do {
-        ++nick_number;
         nick_found = 0;
         cur_c = first_client;
         number_to_str (buf + 1, nick_number);
@@ -26,6 +25,8 @@ char *first_vacant_nick (client_info *first_client)
             }
             cur_c = cur_c->next;
         }
+
+        ++nick_number;
     } while (nick_found);
 
     return buf;
