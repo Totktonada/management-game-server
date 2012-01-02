@@ -117,39 +117,6 @@ void init_server_info (server_info *sinfo)
     new_game_data (sinfo);
 }
 
-/* Add new client to our structures.
- * Exit on failure. */
-void process_new_client (server_info *sinfo, int listening_socket)
-{
-    /* We not save information about client IP and port. */
-    int client_socket = accept (listening_socket, NULL, NULL);
-    client_info *new_client;
-
-    if (ACCEPT_ERROR (client_socket)) {
-        perror ("accept ()");
-        exit (ES_SYSCALL_FAILED);
-    }
-
-    if (game_process_new_client (sinfo)) {
-        /* TODO: write message and disconnect client. */
-        return;
-    }
-
-    new_client = new_client_info (client_socket);
-    new_client->nick = first_vacant_nick (sinfo->first_client);
-
-    if (sinfo->first_client == NULL) {
-        sinfo->last_client = sinfo->first_client = new_client;
-    } else {
-        sinfo->last_client = sinfo->last_client->next = new_client;
-    }
-
-    FD_SET (client_socket, &(sinfo->read_fds));
-    if (sinfo->max_fd < client_socket) {
-        sinfo->max_fd = client_socket;
-    }
-}
-
 /* Remove client from our structures. */
 void unregister_client (server_info *sinfo, client_info *client)
 {
@@ -178,14 +145,17 @@ void unregister_client (server_info *sinfo, client_info *client)
     }
 }
 
-/* Disconnect client */
-void client_disconnect (server_info *sinfo, client_info *client)
+/* Disconnect client. */
+void client_disconnect (server_info *sinfo, client_info *client,
+    int client_in_server_info_list)
 {
     /* TODO: write "Disconnecting..." */
 
-    FD_CLR (client->fd, &(sinfo->read_fds));
-    if (sinfo->max_fd == client->fd) {
-        update_max_fd (sinfo);
+    if (client_in_server_info_list) {
+        FD_CLR (client->fd, &(sinfo->read_fds));
+        if (sinfo->max_fd == client->fd) {
+            update_max_fd (sinfo);
+        }
     }
 
     if (SHUTDOWN_ERROR (
@@ -197,6 +167,44 @@ void client_disconnect (server_info *sinfo, client_info *client)
     if (CLOSE_ERROR (close (client->fd))) {
         perror ("close ()");
         exit (ES_SYSCALL_FAILED);
+    }
+}
+
+/* Add new client to our structures.
+ * Exit on failure. */
+void process_new_client (server_info *sinfo, int listening_socket)
+{
+    /* We not save information about client IP and port. */
+    int client_socket = accept (listening_socket, NULL, NULL);
+    client_info *new_client;
+    char disconnect_msg[] = "Server full.\n";
+
+    if (ACCEPT_ERROR (client_socket)) {
+        perror ("accept ()");
+        exit (ES_SYSCALL_FAILED);
+    }
+
+    new_client = new_client_info (client_socket);
+
+    if (game_process_new_client (sinfo)) {
+        write (client_socket, disconnect_msg,
+            sizeof (disconnect_msg) - 1);
+        client_disconnect (sinfo, new_client, 0);
+        free (new_client);
+        return;
+    }
+
+    new_client->nick = first_vacant_nick (sinfo->first_client);
+
+    if (sinfo->first_client == NULL) {
+        sinfo->last_client = sinfo->first_client = new_client;
+    } else {
+        sinfo->last_client = sinfo->last_client->next = new_client;
+    }
+
+    FD_SET (client_socket, &(sinfo->read_fds));
+    if (sinfo->max_fd < client_socket) {
+        sinfo->max_fd = client_socket;
     }
 }
 
@@ -215,7 +223,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
             /* TODO: tell client about disconnect reason. */
             unregister_client (sinfo, client);
-            client_disconnect (sinfo, client);
+            client_disconnect (sinfo, client, 1);
             free (client);
             break;
         }
@@ -248,7 +256,7 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
             exit (ES_SYSCALL_FAILED);
         } else if (READ_EOF (read_value)) {
             unregister_client (sinfo, cur_c);
-            client_disconnect (sinfo, cur_c);
+            client_disconnect (sinfo, cur_c, 1);
             free (cur_c);
         } else {
             cur_c->read_available = read_value;
