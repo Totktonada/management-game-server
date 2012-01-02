@@ -1,20 +1,21 @@
 #include "game.h"
 
-void new_game_data (game_data *gdata)
+void new_game_data (server_info *sinfo)
 {
-    gdata->users_count = 0;
-    gdata->state = G_ST_WAIT_USERS;
-    gdata->step = 0;
+    sinfo->clients_count = 0;
+    sinfo->state = G_ST_WAIT_CLIENTS;
+    sinfo->step = 0;
 }
 
-void new_user_game_data (user_game_data *user_gdata)
+void new_client_game_data (client_info *client)
 {
-    user_gdata->nick = NULL; /* See process_new_client ()
-        in "main.c". NULL for ignore in first_vacant_nick (). */
-    user_gdata->money = 10000;
-    user_gdata->raw_count = 4;
-    user_gdata->prod_count = 2;
-    user_gdata->factory_count = 2;
+    /* Nick would be changed in process_new_client () in "main.c". */
+    client->nick = NULL;
+    client->money = 10000;
+    client->raw_count = 4;
+    client->prod_count = 2;
+    client->factory_count = 2;
+    client->step_completed = 0; /* Not completed */
 }
 
 #ifndef DAEMON
@@ -129,18 +130,17 @@ Wrong argument: typed command not found.\n\
     }
 }
 
-void do_cmd_nick (user_game_data *user_gdata, int write_fd,
-    char *nick)
+void do_cmd_nick (client_info *client, char *nick)
 {
     char msg_your_nickname[] = "Your nickname: ";
     char msg_newline[] = "\n";
 
     if (nick == NULL) {
-        write (write_fd, msg_your_nickname,
+        write (client->fd, msg_your_nickname,
             sizeof (msg_your_nickname) - 1);
-        write (write_fd, user_gdata->nick,
-            strlen (user_gdata->nick));
-        write (write_fd, msg_newline,
+        write (client->fd, client->nick,
+            strlen (client->nick));
+        write (client->fd, msg_newline,
             sizeof (msg_newline) - 1);
         return;
     }
@@ -149,48 +149,46 @@ void do_cmd_nick (user_game_data *user_gdata, int write_fd,
 }
 
 /* TODO: nick -> username ? */
-void do_cmd_status (game_data *gdata, int write_fd,
+void do_cmd_status (server_info *sinfo, int write_fd,
     char *nick)
 {
     char msg_cl_count[] = "Clients count: ";
     char msg_newline[] = "\n";
 
     if (nick == NULL) {
-        write (write_fd, msg_cl_count,
-            sizeof (msg_cl_count) - 1);
-        write_number (write_fd, gdata->users_count);
-        write (write_fd, msg_newline,
-            sizeof (msg_newline) - 1);
+        write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
+        write_number (write_fd, sinfo->clients_count);
+        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
         return;
     }
 
     /* TODO */
 }
 
-void do_cmd_prod (game_data *gdata, int write_fd,
+void do_cmd_prod (server_info *sinfo, int write_fd,
     int amount, int cost)
 {
     /* TODO */
 }
 
-void do_cmd_buy (game_data *gdata, int write_fd,
+void do_cmd_buy (server_info *sinfo, int write_fd,
     int amount, int cost)
 {
     /* TODO */
 }
 
-void do_cmd_sell (game_data *gdata, int write_fd,
+void do_cmd_sell (server_info *sinfo, int write_fd,
     int amount, int cost)
 {
     /* TODO */
 }
 
-void do_cmd_build (game_data *gdata, int write_fd)
+void do_cmd_build (server_info *sinfo, int write_fd)
 {
     /* TODO */
 }
 
-void do_cmd_turn (game_data *gdata, int write_fd)
+void do_cmd_turn (server_info *sinfo, int write_fd)
 {
     /* TODO */
 }
@@ -203,46 +201,67 @@ Wrong command. Try \"help\".\n";
     write (write_fd, buf, sizeof (buf) - 1);
 }
 
-void execute_cmd (game_data *gdata,
-    user_game_data *user_gdata,
-    int write_fd, command *cmd)
+void execute_cmd (server_info *sinfo,
+    client_info *client, command *cmd)
 {
     switch (cmd->type) {
     case CMD_EMPTY:
         /* Do nothing. */
         break;
     case CMD_HELP:
-        do_cmd_help (write_fd, cmd->value.str);
+        do_cmd_help (client->fd, cmd->value.str);
         break;
     case CMD_NICK:
-        do_cmd_nick (user_gdata, write_fd, cmd->value.str);
+        do_cmd_nick (client, cmd->value.str);
         break;
     case CMD_STATUS:
-        do_cmd_status (gdata, write_fd, cmd->value.str);
+        do_cmd_status (sinfo, client->fd, cmd->value.str);
         break;
     case CMD_PROD:
-        do_cmd_prod (gdata, write_fd,
+        do_cmd_prod (sinfo, client->fd,
             cmd->value.number, cmd->value2.number);
         break;
     case CMD_BUY:
-        do_cmd_buy (gdata, write_fd,
+        do_cmd_buy (sinfo, client->fd,
             cmd->value.number, cmd->value2.number);
         break;
     case CMD_SELL:
-        do_cmd_sell (gdata, write_fd,
+        do_cmd_sell (sinfo, client->fd,
             cmd->value.number, cmd->value2.number);
         break;
     case CMD_BUILD:
-        do_cmd_build (gdata, write_fd);
+        do_cmd_build (sinfo, client->fd);
         break;
     case CMD_TURN:
-        do_cmd_turn (gdata, write_fd);
+        do_cmd_turn (sinfo, client->fd);
         break;
     case CMD_WRONG:
-        do_cmd_wrong (write_fd);
+        do_cmd_wrong (client->fd);
         break;
     case CMD_PROTOCOL_PARSE_ERROR:
         /* Not possible */
         break;
     }
+}
+
+/* Returns:
+ * 0, if client connected
+ * 1, if client count full. */
+int game_process_new_client (server_info *sinfo)
+{
+    if (sinfo->state != G_ST_WAIT_CLIENTS) {
+        return 1;
+    }
+
+    ++(sinfo->clients_count);
+    if (sinfo->clients_count == sinfo->expected_clients) {
+        sinfo->state = G_ST_IN_GAME;
+    }
+
+    return 0;
+}
+
+void game_process_next_step (server_info *sinfo,
+    client_info *first_client)
+{
 }

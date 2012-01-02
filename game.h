@@ -8,34 +8,21 @@
 #include <string.h>
 #include "parser.h"
 #include "utils.h"
+#include "main.h"
 
-typedef enum game_state {
-    G_ST_WAIT_USERS
-    /* TODO */
-} game_state;
+void new_game_data (server_info *sinfo);
+void new_client_game_data (client_info *client);
 
-typedef struct game_data {
-    unsigned int users_count;
-    game_state state;
-    unsigned int step;
-} game_data;
-
-typedef struct user_game_data {
-    char *nick;
-    unsigned int money;
-    unsigned int raw_count;
-    unsigned int prod_count;
-    unsigned int factory_count;
-} user_game_data;
-
-void new_game_data (game_data *gdata);
-void new_user_game_data (user_game_data *user_gdata);
 #ifndef DAEMON
 void print_cmd (command *cmd);
 #endif
-void execute_cmd (game_data *gdata,
-    user_game_data *user_gdata,
-    int write_fd, command *cmd);
 
+void execute_cmd (server_info *sinfo,
+    client_info *client, command *cmd);
+
+int game_process_new_client (server_info *sinfo);
+
+void game_process_next_step (server_info *sinfo,
+    client_info *first_client);
 
 #endif

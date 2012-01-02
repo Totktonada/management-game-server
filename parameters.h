@@ -8,13 +8,14 @@
 #include "main.h"
 #include "utils.h"
 
-/* Exit status, if user type wrong
+/* Exit status, if client type wrong
  * command line parameters. */
 #define ES_WRONG_PARAM 2
 
 typedef enum parameters_parser_state {
     PARAM_P_ST_START,
     PARAM_P_ST_PORT,
+    PARAM_P_ST_CLIENTS,
     PARAM_P_ST_ERROR
 } parameters_parser_state;
 

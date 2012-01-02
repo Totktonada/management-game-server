@@ -17,11 +17,11 @@ char *first_vacant_nick (client_info *first_client)
         number_to_str (buf + 1, nick_number);
 
         while (cur_c != NULL && !nick_found) {
-            if (cur_c->user_gdata.nick == NULL) {
+            if (cur_c->nick == NULL) {
                 nick_found = 0;
             } else {
                 nick_found = STR_EQUAL (buf,
-                    cur_c->user_gdata.nick);
+                    cur_c->nick);
             }
             cur_c = cur_c->next;
         }
@@ -100,8 +100,8 @@ client_info *new_client_info (int client_socket)
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info (&(client->pinfo));
-    new_user_game_data (&(client->user_gdata));
     client->next = NULL;
+    new_client_game_data (client);
     return client;
 }
 
@@ -114,7 +114,7 @@ void init_server_info (server_info *sinfo)
     FD_SET (sinfo->listening_socket, &(sinfo->read_fds));
     sinfo->first_client = NULL;
     update_max_fd (sinfo);
-    new_game_data (&(sinfo->gdata));
+    new_game_data (sinfo);
 }
 
 /* Add new client to our structures.
@@ -123,23 +123,26 @@ void process_new_client (server_info *sinfo, int listening_socket)
 {
     /* We not save information about client IP and port. */
     int client_socket = accept (listening_socket, NULL, NULL);
+    client_info *new_client;
 
     if (ACCEPT_ERROR (client_socket)) {
         perror ("accept ()");
         exit (ES_SYSCALL_FAILED);
     }
 
-    if (sinfo->first_client == NULL) {
-        sinfo->last_client = sinfo->first_client =
-            new_client_info (client_socket);
-    } else {
-        sinfo->last_client = sinfo->last_client->next =
-            new_client_info (client_socket);
+    if (game_process_new_client (sinfo)) {
+        /* TODO: write message and disconnect client. */
+        return;
     }
 
-    ++sinfo->gdata.users_count;
-    sinfo->last_client->user_gdata.nick =
-        first_vacant_nick (sinfo->first_client);
+    new_client = new_client_info (client_socket);
+    new_client->nick = first_vacant_nick (sinfo->first_client);
+
+    if (sinfo->first_client == NULL) {
+        sinfo->last_client = sinfo->first_client = new_client;
+    } else {
+        sinfo->last_client = sinfo->last_client->next = new_client;
+    }
 
     FD_SET (client_socket, &(sinfo->read_fds));
     if (sinfo->max_fd < client_socket) {
@@ -166,7 +169,7 @@ void unregister_client (server_info *sinfo, client_info *client)
             if (cur_c == sinfo->last_client)
                 sinfo->last_client = prev_c;
 
-            --sinfo->gdata.users_count;
+            --sinfo->clients_count;
             break;
         }
 
@@ -210,7 +213,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
         if (cmd == NULL)
             break;
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
-            /* TODO: tell user about disconnect reason. */
+            /* TODO: tell client about disconnect reason. */
             unregister_client (sinfo, client);
             client_disconnect (sinfo, client);
             free (client);
@@ -219,9 +222,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #ifndef DAEMON
         print_cmd (cmd);
 #endif
-        execute_cmd (&(sinfo->gdata),
-            &(client->user_gdata),
-            client->fd, cmd);
+        execute_cmd (sinfo, client, cmd);
         destroy_cmd (cmd);
     } while (1);
 }

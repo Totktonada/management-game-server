@@ -20,7 +20,6 @@
 #define READ_BUFFER_SIZE 1024
 
 #include "parser.h"
-#include "game.h"
 #include "utils.h"
 
 /* Exit status, if one of next system calls failed:
@@ -49,9 +48,20 @@ typedef struct client_info {
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
     parser_info pinfo;
-    user_game_data user_gdata;
     struct client_info *next;
+    /* Client game data */
+    char *nick;
+    unsigned int money;
+    unsigned int raw_count;
+    unsigned int prod_count;
+    unsigned int factory_count;
+    unsigned int step_completed:1;
 } client_info;
+
+typedef enum game_state {
+    G_ST_WAIT_CLIENTS,
+    G_ST_IN_GAME
+} game_state;
 
 typedef struct server_info {
     int listening_port;
@@ -60,9 +70,14 @@ typedef struct server_info {
     int max_fd;
     client_info *first_client;
     client_info *last_client;
-    game_data gdata;
+    int expected_clients;
+    /* Game data */
+    unsigned int clients_count;
+    game_state state;
+    unsigned int step;
 } server_info;
 
 #include "parameters.h"
+#include "game.h"
 
 #endif
