@@ -177,7 +177,7 @@ void process_new_client (server_info *sinfo, int listening_socket)
     /* We not save information about client IP and port. */
     int client_socket = accept (listening_socket, NULL, NULL);
     client_info *new_client;
-    char disconnect_msg[] = "Server full.\n";
+    char msg_disconnect[] = "Server full.\n";
 
     if (ACCEPT_ERROR (client_socket)) {
         perror ("accept ()");
@@ -187,8 +187,8 @@ void process_new_client (server_info *sinfo, int listening_socket)
     new_client = new_client_info (client_socket);
 
     if (game_process_new_client (sinfo)) {
-        write (client_socket, disconnect_msg,
-            sizeof (disconnect_msg) - 1);
+        write (client_socket, msg_disconnect,
+            sizeof (msg_disconnect) - 1);
         client_disconnect (sinfo, new_client, 0);
         free (new_client);
         return;
