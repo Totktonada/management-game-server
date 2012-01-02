@@ -11,7 +11,7 @@ typedef enum type_of_cmd {
     CMD_EMPTY,  /* '\n' */
     CMD_HELP,   /* help [command] */
     CMD_NICK,   /* nick [string] */
-    CMD_STATUS, /* status [username] */
+    CMD_STATUS, /* status [username | --all | -a] */
     CMD_PROD,   /* prod amount cost */
     CMD_BUY,    /* buy amount cost */
     CMD_SELL,   /* sell amount cost */

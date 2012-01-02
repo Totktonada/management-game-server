@@ -75,7 +75,7 @@ void do_cmd_help (int write_fd, char *cmd_name)
 Available commands:\n\
 * help [command]\n\
 * nick [string]\n\
-* status [username]\n\
+* status [username | --all | -a]\n\
 * prod amount cost\n\
 * buy amount cost\n\
 * sell amount cost\n\
@@ -145,24 +145,127 @@ void do_cmd_nick (client_info *client, char *nick)
         return;
     }
 
-    /* TODO */
+    /* TODO: change nick. */
+    /* TODO: forbid nick, starts with '-'. */
+}
+
+void write_common_information (int write_fd, server_info *sinfo)
+{
+    char msg_newline[] = "\n";
+    char msg_cl_count[] = "Connected clients count: ";
+    char msg_step[] = "Step: ";
+
+    write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
+    write_number (write_fd, sinfo->clients_count);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_step, sizeof (msg_step) - 1);
+    write_number (write_fd, sinfo->step);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
 }
 
 /* TODO: nick -> username ? */
-void do_cmd_status (server_info *sinfo, int write_fd,
+void write_client_information (int write_fd, client_info *client)
+{
+    char msg_newline[] = "\n";
+    char msg_client_info_head[] = "-------------------\n";
+    char msg_nick[] = "Username: ";
+    char msg_money[] = "Money: ";
+    char msg_raw_count[] = "Raws: ";
+    char msg_prod_count[] = "Productions: ";
+    char msg_factory_count[] = "Factories: ";
+    char msg_step_completed[] = "Step completed: ";
+
+    write (write_fd, msg_client_info_head,
+        sizeof (msg_client_info_head) - 1);
+
+    write (write_fd, msg_nick, sizeof (msg_nick) - 1);
+    write (write_fd, client->nick, strlen (client->nick));
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_money, sizeof (msg_money) - 1);
+    write_number (write_fd, client->money);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_raw_count, sizeof (msg_raw_count) - 1);
+    write_number (write_fd, client->raw_count);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_prod_count, sizeof (msg_prod_count) - 1);
+    write_number (write_fd, client->prod_count);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_factory_count,
+        sizeof (msg_factory_count) - 1);
+    write_number (write_fd, client->factory_count);
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    write (write_fd, msg_step_completed,
+        sizeof (msg_step_completed) - 1);
+    write_number (write_fd, client->step_completed);
+    /* TODO: write "true" or "false". */
+    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+}
+
+/* Returns:
+ * client with nick equal to nick argument;
+ * NULL, if same client not found. */
+client_info *get_client_by_nick (client_info *first_client,
     char *nick)
 {
-    char msg_cl_count[] = "Clients count: ";
-    char msg_newline[] = "\n";
+    client_info *cur_client;
 
-    if (nick == NULL) {
-        write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
-        write_number (write_fd, sinfo->clients_count);
-        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
-        return;
+    for (cur_client = first_client;
+        cur_client != NULL;
+        cur_client = cur_client->next)
+    {
+        if (STR_EQUAL (nick, cur_client->nick)) {
+            return cur_client;
+        }
     }
 
-    /* TODO */
+    return NULL;
+}
+
+void do_cmd_status (server_info *sinfo, client_info *client,
+    char *nick)
+{
+    char msg_client_not_found[] = "\
+Client with same username not found, try \"status --all\".\n";
+    int write_info_for_all_clients = 0;
+    int write_info_for_myself = 0;
+    client_info *pointed_client = NULL;
+    client_info *cur_client;
+
+    if (nick == NULL) {
+        write_info_for_myself = 1;
+    } else if (STR_EQUAL_CASE_INS (nick, "--all")
+        || STR_EQUAL_CASE_INS (nick, "-a"))
+    {
+        write_info_for_all_clients = 1;
+    } else {
+        pointed_client = get_client_by_nick (sinfo->first_client, nick);
+        if (pointed_client == NULL) {
+            write (client->fd, msg_client_not_found,
+                sizeof (msg_client_not_found) - 1);
+            return;
+        }
+    }
+
+    write_common_information (client->fd, sinfo);
+
+    if (write_info_for_all_clients) {
+        for (cur_client = sinfo->first_client;
+            cur_client != NULL;
+            cur_client = cur_client->next)
+        {
+            write_client_information (client->fd, cur_client);
+        }
+    } else if (write_info_for_myself) {
+        write_client_information (client->fd, client);
+    } else {
+        write_client_information (client->fd, pointed_client);
+    }
 }
 
 void do_cmd_prod (server_info *sinfo, int write_fd,
@@ -188,9 +291,43 @@ void do_cmd_build (server_info *sinfo, int write_fd)
     /* TODO */
 }
 
-void do_cmd_turn (server_info *sinfo, int write_fd)
+void do_cmd_turn (server_info *sinfo, client_info *client)
 {
-    /* TODO */
+    char msg_step_completed[] = "\
+Step already completed, wait for other clients.\n";
+    char msg_wait_clients[] = "\
+Server wait for full count of clients. Please wait.\n";
+    client_info *cur_client;
+    int all_clients_step_completed;
+
+    if (sinfo->state == G_ST_WAIT_CLIENTS) {
+        write (client->fd, msg_wait_clients,
+            sizeof (msg_wait_clients) - 1);
+        return;
+    }
+
+    if (client->step_completed) {
+        write (client->fd, msg_step_completed,
+            sizeof (msg_step_completed) - 1);
+        return;
+    }
+
+    client->step_completed = 1;
+
+    all_clients_step_completed = 1;
+    for (cur_client = sinfo->first_client;
+        cur_client != NULL;
+        cur_client = cur_client->next)
+    {
+        if (! cur_client->step_completed) {
+            all_clients_step_completed = 0;
+            break;
+        }
+    }
+
+    if (all_clients_step_completed) {
+        game_process_next_step (sinfo);
+    }
 }
 
 void do_cmd_wrong (int write_fd)
@@ -215,7 +352,7 @@ void execute_cmd (server_info *sinfo,
         do_cmd_nick (client, cmd->value.str);
         break;
     case CMD_STATUS:
-        do_cmd_status (sinfo, client->fd, cmd->value.str);
+        do_cmd_status (sinfo, client, cmd->value.str);
         break;
     case CMD_PROD:
         do_cmd_prod (sinfo, client->fd,
@@ -233,7 +370,7 @@ void execute_cmd (server_info *sinfo,
         do_cmd_build (sinfo, client->fd);
         break;
     case CMD_TURN:
-        do_cmd_turn (sinfo, client->fd);
+        do_cmd_turn (sinfo, client);
         break;
     case CMD_WRONG:
         do_cmd_wrong (client->fd);
@@ -261,7 +398,28 @@ int game_process_new_client (server_info *sinfo)
     return 0;
 }
 
-void game_process_next_step (server_info *sinfo,
-    client_info *first_client)
+void game_process_next_step (server_info *sinfo)
 {
+    client_info *cur_client;
+    char msg_bankrupt[] = "You are bankrupt!\n";
+
+    ++(sinfo->step);
+
+    for (cur_client = sinfo->first_client;
+        cur_client != NULL;
+        cur_client = cur_client->next)
+    {
+        cur_client->step_completed = 0;
+
+        cur_client->money -= RAW_EXPENSES * cur_client->raw_count;
+        cur_client->money -= PROD_EXPENSES * cur_client->prod_count;
+        cur_client->money -= FACTORY_EXPENSES * cur_client->factory_count;
+        if (cur_client->money < 0) {
+            write (cur_client->fd, msg_bankrupt,
+                sizeof (msg_bankrupt) - 1);
+            unregister_client (sinfo, cur_client);
+            client_disconnect (sinfo, cur_client, 1);
+            free (cur_client);
+        }
+    }
 }

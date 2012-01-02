@@ -10,6 +10,10 @@
 #include "utils.h"
 #include "main.h"
 
+#define RAW_EXPENSES 300
+#define PROD_EXPENSES 500
+#define FACTORY_EXPENSES 1000
+
 void new_game_data (server_info *sinfo);
 void new_client_game_data (client_info *client);
 
@@ -21,8 +25,6 @@ void execute_cmd (server_info *sinfo,
     client_info *client, command *cmd);
 
 int game_process_new_client (server_info *sinfo);
-
-void game_process_next_step (server_info *sinfo,
-    client_info *first_client);
+void game_process_next_step (server_info *sinfo);
 
 #endif

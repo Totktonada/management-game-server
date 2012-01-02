@@ -51,7 +51,7 @@ typedef struct client_info {
     struct client_info *next;
     /* Client game data */
     char *nick;
-    unsigned int money;
+    int money;
     unsigned int raw_count;
     unsigned int prod_count;
     unsigned int factory_count;
@@ -76,6 +76,13 @@ typedef struct server_info {
     game_state state;
     unsigned int step;
 } server_info;
+
+void unregister_client (server_info *sinfo,
+    client_info *client);
+
+void client_disconnect (server_info *sinfo,
+    client_info *client,
+    int client_in_server_info_list);
 
 #include "parameters.h"
 #include "game.h"
