@@ -386,9 +386,52 @@ Wrong command. Try \"help\".\n";
     write (write_fd, buf, sizeof (buf) - 1);
 }
 
+/* Returns:
+ * 0, if command not permitted in current server state;
+ * 1, otherwise. */
+int permit_command (server_info *sinfo, command *cmd)
+{
+    switch (cmd->type) {
+    case CMD_EMPTY:
+    case CMD_HELP:
+    case CMD_STATUS:
+    case CMD_NICK:
+        return 1;
+#if 0
+    /* Last client can not change nick. */
+    case CMD_NICK:
+        return (sinfo->state == G_ST_WAIT_CLIENTS);
+#endif
+
+    case CMD_BUILD:
+    case CMD_PROD:
+    case CMD_BUY:
+    case CMD_SELL:
+    case CMD_TURN:
+        return (sinfo->state == G_ST_IN_GAME);
+
+    case CMD_WRONG:
+    case CMD_PROTOCOL_PARSE_ERROR:
+        /* Continue processing in execute_cmd (). */
+        return 1;
+    }
+
+    return 1;
+}
+
 void execute_cmd (server_info *sinfo,
     client_info *client, command *cmd)
 {
+    char msg_not_permitted[] = "\
+This command not permitted in current server state.\n";
+
+    if (! permit_command (sinfo, cmd)) {
+        /* TODO: more detailed responses. */
+        write (client->fd, msg_not_permitted,
+            sizeof (msg_not_permitted));
+        return;
+    }
+
     switch (cmd->type) {
     case CMD_EMPTY:
         /* Do nothing. */
