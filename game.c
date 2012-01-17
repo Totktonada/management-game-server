@@ -7,6 +7,16 @@ void new_game_data (server_info *sinfo)
     sinfo->step = 0;
 }
 
+void drop_request (client_info *client)
+{
+    client->build_factory_count = 0;
+    client->make_prod_count = 0;
+    client->buy_raw_count = 0;
+    client->buy_raw_cost = 0;
+    client->sell_prod_count = 0;
+    client->sell_prod_cost = 0;
+}
+
 void new_client_game_data (client_info *client)
 {
     /* Nick would be changed in process_new_client () in "main.c". */
@@ -15,7 +25,9 @@ void new_client_game_data (client_info *client)
     client->raw_count = 4;
     client->prod_count = 2;
     client->factory_count = 2;
-    client->step_completed = 0; /* Not completed */
+    client->step_completed = 0; /* Step not completed */
+
+    drop_request (client);
 }
 
 #ifndef DAEMON
@@ -34,6 +46,9 @@ void print_cmd (command *cmd)
     case CMD_STATUS:
         printf ("[CMD_STATUS]\n");
         break;
+    case CMD_BUILD:
+        printf ("[CMD_BUILD]\n");
+        break;
     case CMD_PROD:
         printf ("[CMD_PROD]\n");
         break;
@@ -42,9 +57,6 @@ void print_cmd (command *cmd)
         break;
     case CMD_SELL:
         printf ("[CMD_SELL]\n");
-        break;
-    case CMD_BUILD:
-        printf ("[CMD_BUILD]\n");
         break;
     case CMD_TURN:
         printf ("[CMD_TURN]\n");
@@ -76,10 +88,10 @@ Available commands:\n\
 * help [command]\n\
 * nick [string]\n\
 * status [username | --all | -a]\n\
-* prod amount cost\n\
-* buy amount cost\n\
-* sell amount cost\n\
-* build\n\
+* build count\n\
+* prod count\n\
+* buy count cost\n\
+* sell count cost\n\
 * turn\n\
 Command parser is case insensitive and have fun,\
  when you type commands in uppercase.\n\
@@ -109,13 +121,14 @@ Wrong argument: typed command not found.\n\
         break;
     case CMD_STATUS:
         break;
+    case CMD_BUILD:
+        break;
     case CMD_PROD:
+        /* TODO: information about cost of one production. */
         break;
     case CMD_BUY:
         break;
     case CMD_SELL:
-        break;
-    case CMD_BUILD:
         break;
     case CMD_TURN:
         break;
@@ -205,6 +218,8 @@ void write_client_information (int write_fd, client_info *client)
     write_number (write_fd, client->step_completed);
     /* TODO: write "true" or "false". */
     write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+
+    /* TODO: write information about requests */
 }
 
 /* Returns:
@@ -268,27 +283,60 @@ Client with same username not found, try \"status --all\".\n";
     }
 }
 
-void do_cmd_prod (server_info *sinfo, int write_fd,
-    int amount, int cost)
+void do_cmd_build (client_info *client, int count)
 {
-    /* TODO */
+    char msg_request_stored[] = "\
+Your request stored to processing on end of step.\n";
+
+    client->build_factory_count = count;
+
+    write (client->fd, msg_request_stored,
+        sizeof (msg_request_stored) - 1);
 }
 
-void do_cmd_buy (server_info *sinfo, int write_fd,
-    int amount, int cost)
+void do_cmd_prod (client_info *client, int count)
 {
-    /* TODO */
+    char msg_request_stored[] = "\
+Your request stored to processing on end of step.\n";
+    char msg_too_few_factories[] = "\
+You have too few factories. Request rejected.\n";
+
+    if (count > client->factory_count) {
+        write (client->fd, msg_too_few_factories,
+            sizeof (msg_too_few_factories) - 1);
+        return;
+    }
+
+    client->make_prod_count = count;
+
+    write (client->fd, msg_request_stored,
+        sizeof (msg_request_stored) - 1);
 }
 
-void do_cmd_sell (server_info *sinfo, int write_fd,
-    int amount, int cost)
+void do_cmd_buy (client_info *client, int count, int cost)
 {
-    /* TODO */
+    char msg_request_stored[] = "\
+Your request stored to processing on end of step.\n";
+
+    /* TODO: check values in dependence on market_level. */
+    client->buy_raw_count = count;
+    client->buy_raw_cost = cost;
+
+    write (client->fd, msg_request_stored,
+        sizeof (msg_request_stored) - 1);
 }
 
-void do_cmd_build (server_info *sinfo, int write_fd)
+void do_cmd_sell (client_info *client, int count, int cost)
 {
-    /* TODO */
+    char msg_request_stored[] = "\
+Your request stored to processing on end of step.\n";
+
+    /* TODO: check values in dependence on market_level. */
+    client->sell_prod_count = count;
+    client->sell_prod_cost = cost;
+
+    write (client->fd, msg_request_stored,
+        sizeof (msg_request_stored) - 1);
 }
 
 void do_cmd_turn (server_info *sinfo, client_info *client)
@@ -354,20 +402,17 @@ void execute_cmd (server_info *sinfo,
     case CMD_STATUS:
         do_cmd_status (sinfo, client, cmd->value.str);
         break;
+    case CMD_BUILD:
+        do_cmd_build (client, cmd->value.number);
+        break;
     case CMD_PROD:
-        do_cmd_prod (sinfo, client->fd,
-            cmd->value.number, cmd->value2.number);
+        do_cmd_prod (client, cmd->value.number);
         break;
     case CMD_BUY:
-        do_cmd_buy (sinfo, client->fd,
-            cmd->value.number, cmd->value2.number);
+        do_cmd_buy (client, cmd->value.number, cmd->value2.number);
         break;
     case CMD_SELL:
-        do_cmd_sell (sinfo, client->fd,
-            cmd->value.number, cmd->value2.number);
-        break;
-    case CMD_BUILD:
-        do_cmd_build (sinfo, client->fd);
+        do_cmd_sell (client, cmd->value.number, cmd->value2.number);
         break;
     case CMD_TURN:
         do_cmd_turn (sinfo, client);
@@ -398,10 +443,43 @@ int game_process_new_client (server_info *sinfo)
     return 0;
 }
 
+void grant_request (server_info *sinfo, client_info *client)
+{
+    /* to transform
+    client->build_factory_count = 0;
+    client->make_prod_count = 0;
+    client->buy_raw_count = 0;
+    client->buy_raw_cost = 0;
+    client->sell_prod_count = 0;
+    client->sell_prod_cost = 0;
+    */
+}
+
+void after_step_expenses (client_info *client)
+{
+    /* TODO: write messages about money change. */
+    client->money -= RAW_EXPENSES * client->raw_count;
+    client->money -= PROD_EXPENSES * client->prod_count;
+    client->money -= FACTORY_EXPENSES * client->factory_count;
+}
+
+void process_client_bankrupt (server_info *sinfo, client_info *client)
+{
+    char msg_bankrupt[] = "You are bankrupt!\n";
+
+    /* TODO: maybe, do not disconnect client and permit only
+     * "help" and "status" commands. */
+    /* TODO: messages about this event for all clients. */
+    write (client->fd, msg_bankrupt,
+        sizeof (msg_bankrupt) - 1);
+    unregister_client (sinfo, client);
+    client_disconnect (sinfo, client, 1);
+    free (client);
+}
+
 void game_process_next_step (server_info *sinfo)
 {
     client_info *cur_client;
-    char msg_bankrupt[] = "You are bankrupt!\n";
 
     ++(sinfo->step);
 
@@ -411,15 +489,16 @@ void game_process_next_step (server_info *sinfo)
     {
         cur_client->step_completed = 0;
 
-        cur_client->money -= RAW_EXPENSES * cur_client->raw_count;
-        cur_client->money -= PROD_EXPENSES * cur_client->prod_count;
-        cur_client->money -= FACTORY_EXPENSES * cur_client->factory_count;
+        after_step_expenses (cur_client);
         if (cur_client->money < 0) {
-            write (cur_client->fd, msg_bankrupt,
-                sizeof (msg_bankrupt) - 1);
-            unregister_client (sinfo, cur_client);
-            client_disconnect (sinfo, cur_client, 1);
-            free (cur_client);
+            process_client_bankrupt (sinfo, cur_client);
         }
-    }
+
+        /* to remove
+        grant_request (sinfo, cur_client);
+        drop_request (cur_client);
+        */
+    } /* for */
+
+    /* TODO: auctions */
 }

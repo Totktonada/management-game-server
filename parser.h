@@ -12,15 +12,16 @@ typedef enum type_of_cmd {
     CMD_HELP,   /* help [command] */
     CMD_NICK,   /* nick [string] */
     CMD_STATUS, /* status [username | --all | -a] */
-    CMD_PROD,   /* prod amount cost */
-    CMD_BUY,    /* buy amount cost */
-    CMD_SELL,   /* sell amount cost */
-    CMD_BUILD,  /* build */
+    CMD_BUILD,  /* build count */
+    CMD_PROD,   /* prod count */
+    CMD_BUY,    /* buy count cost */
+    CMD_SELL,   /* sell count cost */
     CMD_TURN,   /* turn */
     CMD_WRONG,
     CMD_PROTOCOL_PARSE_ERROR
 } type_of_cmd;
 
+/* TODO: move this fields to parser_info. */
 typedef struct command {
     type_of_cmd type;
     value_of_lex value;

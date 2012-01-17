@@ -71,7 +71,6 @@ command *p_st_process_arg1 (parser_info *pinfo)
 {
     switch (pinfo->tmp_cmd.type) {
     /* Commands without arguments. */
-    case CMD_BUILD:
     case CMD_TURN:
         pinfo->state = P_ST_EXPECT_EOLN;
         break;
@@ -83,13 +82,19 @@ command *p_st_process_arg1 (parser_info *pinfo)
         pinfo->state = P_ST_EXPECT_OPTIONAL_STR;
         break;
 
+    /* Commands with one numerical argument. */
+    case CMD_BUILD:
     case CMD_PROD:
+        pinfo->state = P_ST_EXPECT_ONE_NUMBER;
+        break;
+
+    /* Commands with two numerical arguments. */
     case CMD_BUY:
     case CMD_SELL:
         pinfo->state = P_ST_EXPECT_TWO_NUMBERS;
         break;
 
-    /* Not possible */
+    /* Not possible. */
     default:
 #ifndef DAEMON
         fprintf (stderr, "Parser: error in line %d", __LINE__);
@@ -108,16 +113,19 @@ command *p_st_process_arg2 (parser_info *pinfo)
     case CMD_HELP:
     case CMD_NICK:
     case CMD_STATUS:
+    /* Commands with one numerical argument. */
+    case CMD_BUILD:
+    case CMD_PROD:
         pinfo->state = P_ST_EXPECT_EOLN;
         break;
 
-    case CMD_PROD:
+    /* Commands with two numerical arguments. */
     case CMD_BUY:
     case CMD_SELL:
         pinfo->state = P_ST_EXPECT_ONE_NUMBER;
         break;
 
-    /* Not possible */
+    /* Not possible. */
     default:
 #ifndef DAEMON
         fprintf (stderr, "Parser: error in line %d", __LINE__);
@@ -216,7 +224,22 @@ command *p_st_expect_one_number (parser_info *pinfo)
 {
     switch (pinfo->cur_lex->type) {
     case LEX_NUMBER:
-        pinfo->tmp_cmd.value2 = pinfo->cur_lex->value;
+        switch (pinfo->tmp_cmd.type) {
+        case CMD_BUILD:
+        case CMD_PROD:
+            pinfo->tmp_cmd.value = pinfo->cur_lex->value;
+            break;
+        case CMD_BUY:
+        case CMD_SELL:
+            pinfo->tmp_cmd.value2 = pinfo->cur_lex->value;
+            break;
+        default:
+            /* Not possible. */
+#ifndef DAEMON
+            fprintf (stderr, "Parser: error in line %d", __LINE__);
+#endif
+            return NULL;
+        }
         pinfo->request_for_lex = 1;
         pinfo->state = P_ST_EXPECT_EOLN;
         break;

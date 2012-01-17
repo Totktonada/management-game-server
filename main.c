@@ -255,6 +255,7 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
             perror ("read ()");
             exit (ES_SYSCALL_FAILED);
         } else if (READ_EOF (read_value)) {
+            /* TODO: messages about this event for all clients. */
             unregister_client (sinfo, cur_c);
             client_disconnect (sinfo, cur_c, 1);
             free (cur_c);
