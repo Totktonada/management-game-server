@@ -70,16 +70,32 @@ typedef struct client_info {
     /* Requests */
     unsigned int build_factory_count;
     unsigned int make_prod_count;
+#if 0
     unsigned int buy_raw_count;
     unsigned int buy_raw_cost;
     unsigned int sell_prod_count;
     unsigned int sell_prod_cost;
+#endif
+    /* Building factories */
+    /* Count of 1, 2, 3, 4 month old
+     * factories. */
+    unsigned int building_factory_1;
+    unsigned int building_factory_2;
+    unsigned int building_factory_3;
+    unsigned int building_factory_4;
 } client_info;
 
 typedef enum game_state {
     G_ST_WAIT_CLIENTS,
     G_ST_IN_GAME
 } game_state;
+
+typedef struct market_request {
+    struct market_request *next;
+    client_info *client;
+    unsigned int count;
+    unsigned int cost;
+} market_request;
 
 typedef struct server_info {
     int listening_port;
@@ -93,6 +109,9 @@ typedef struct server_info {
     unsigned int clients_count;
     game_state state;
     unsigned int step;
+    unsigned int market_level:3; /* [0-4] */
+    market_request *buy_raw;
+    market_request *sell_prod;
 } server_info;
 
 void unregister_client (server_info *sinfo,

@@ -5,16 +5,20 @@ void new_game_data (server_info *sinfo)
     sinfo->clients_count = 0;
     sinfo->state = G_ST_WAIT_CLIENTS;
     sinfo->step = 0;
+    sinfo->buy_raw = NULL;
+    sinfo->sell_prod = NULL;
 }
 
 void drop_request (client_info *client)
 {
     client->build_factory_count = 0;
     client->make_prod_count = 0;
+#if 0
     client->buy_raw_count = 0;
     client->buy_raw_cost = 0;
     client->sell_prod_count = 0;
     client->sell_prod_cost = 0;
+#endif
 }
 
 void new_client_game_data (client_info *client)
@@ -28,6 +32,77 @@ void new_client_game_data (client_info *client)
     client->step_completed = 0; /* Step not completed */
 
     drop_request (client);
+}
+
+market_request *new_market_request (client_info *client,
+    unsigned int count, unsigned int cost)
+{
+    market_request *req = (market_request *)
+        malloc (sizeof (market_request));
+    req->next = NULL;
+    req->client = client;
+    req->count = count;
+    req->cost = cost;
+    return req;
+}
+
+void add_buy_raw_request (server_info *sinfo, market_request *req)
+{
+    market_request *cur, *next;
+
+    if (sinfo->buy_raw == NULL) {
+        sinfo->buy_raw = req;
+        return;
+    }
+
+    if (req->cost >= sinfo->buy_raw->cost) {
+        req->next = sinfo->buy_raw;
+        sinfo->buy_raw = req;
+        return;
+    }
+
+    cur = sinfo->buy_raw;
+
+    do {
+        next = cur->next;
+        if (next == NULL || req->cost >= next->cost)
+        {
+            req->next = next;
+            cur->next = req;
+            return;
+        }
+        cur = next;
+    } while (1);
+}
+
+void add_sell_prod_request (server_info *sinfo, market_request *req)
+{
+    market_request *cur, *next;
+
+    if (sinfo->sell_prod == NULL) {
+        sinfo->sell_prod = req;
+        return;
+    }
+
+    if (req->cost <= sinfo->sell_prod->cost) {
+        req->next = sinfo->sell_prod;
+        sinfo->sell_prod = req;
+        return;
+    }
+
+    cur = sinfo->sell_prod;
+
+    do {
+        next = cur->next;
+        if (next == NULL || req->cost <= next->cost)
+        {
+            req->next = next;
+            cur->next = req;
+            return;
+        }
+        cur = next;
+    } while (1);
+
 }
 
 #ifndef DAEMON
@@ -288,6 +363,7 @@ void do_cmd_build (client_info *client, int count)
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
 
+    /* TODO: check money. */
     client->build_factory_count = count;
 
     write (client->fd, msg_request_stored,
@@ -301,6 +377,7 @@ Your request stored to processing on end of step.\n";
     char msg_too_few_factories[] = "\
 You have too few factories. Request rejected.\n";
 
+    /* TODO: check money (nessassary?). */
     if (count > client->factory_count) {
         write (client->fd, msg_too_few_factories,
             sizeof (msg_too_few_factories) - 1);
@@ -313,27 +390,31 @@ You have too few factories. Request rejected.\n";
         sizeof (msg_request_stored) - 1);
 }
 
-void do_cmd_buy (client_info *client, int count, int cost)
+void do_cmd_buy (server_info *sinfo, client_info *client,
+    int count, int cost)
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
+    market_request *req;
 
     /* TODO: check values in dependence on market_level. */
-    client->buy_raw_count = count;
-    client->buy_raw_cost = cost;
+    req = new_market_request (client, count, cost);
+    add_buy_raw_request (sinfo, req);
 
     write (client->fd, msg_request_stored,
         sizeof (msg_request_stored) - 1);
 }
 
-void do_cmd_sell (client_info *client, int count, int cost)
+void do_cmd_sell (server_info *sinfo, client_info *client,
+    int count, int cost)
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
+    market_request *req;
 
     /* TODO: check values in dependence on market_level. */
-    client->sell_prod_count = count;
-    client->sell_prod_cost = cost;
+    req = new_market_request (client, count, cost);
+    add_sell_prod_request (sinfo, req);
 
     write (client->fd, msg_request_stored,
         sizeof (msg_request_stored) - 1);
@@ -452,10 +533,12 @@ This command not permitted in current server state.\n";
         do_cmd_prod (client, cmd->value.number);
         break;
     case CMD_BUY:
-        do_cmd_buy (client, cmd->value.number, cmd->value2.number);
+        do_cmd_buy (sinfo, client,
+            cmd->value.number, cmd->value2.number);
         break;
     case CMD_SELL:
-        do_cmd_sell (client, cmd->value.number, cmd->value2.number);
+        do_cmd_sell (sinfo, client,
+            cmd->value.number, cmd->value2.number);
         break;
     case CMD_TURN:
         do_cmd_turn (sinfo, client);
@@ -520,6 +603,68 @@ void process_client_bankrupt (server_info *sinfo, client_info *client)
     free (client);
 }
 
+void buy_raw_one_group (market_request *req)
+{
+    market_request *first_in_group = req;
+    unsigned int group_size = 0;
+    market_request *next;
+    unsigned int random_from_group;
+
+    while (req != NULL) {
+        next = req->next;
+        ++group_size;
+        if (next == NULL || next->cost != req->cost)
+            break;
+        req = next;
+    }
+
+    random_from_group = /* TODO */;
+
+    for (i = 0; i < random_from_group; ++i)
+        req = req->next;
+    make_request (req);
+
+    /* TODO: remove request form list. */
+}
+
+void buy_raw_auction (market_request *req)
+{
+    /* TODO */
+    while (req != NULL)
+}
+
+void sell_prod_auction (market_request *req)
+{
+    /* TODO */
+}
+
+/* Make production and build factories. */
+void grant_requests (client_info *client)
+{
+    /* TODO: messages for clients. */
+
+    /* Make production. */
+    client->raw_count -= client->make_prod_count;
+    client->money -= client->make_prod_count * MAKE_PROD_COST;
+
+    /* Build factories. */
+#if 0
+    client->money -=
+        client->build_factory_count * MAKE_FACTORY_FIRST_HALF;
+#endif
+
+    client->factory_count += client->building_factory_4;
+    client->building_factory_4 = client->building_factory_3;
+    client->building_factory_3 = client->building_factory_2;
+    client->building_factory_2 = client->building_factory_1;
+    client->building_factory_1 = client->build_factory_count;
+
+    client->money -=
+        client->building_factory_1 * MAKE_FACTORY_FIRST_HALF;
+    client->money -=
+        client->building_factory_4 * MAKE_FACTORY_SECOND_HALF;
+}
+
 void game_process_next_step (server_info *sinfo)
 {
     client_info *cur_client;
@@ -536,12 +681,18 @@ void game_process_next_step (server_info *sinfo)
         if (cur_client->money < 0) {
             process_client_bankrupt (sinfo, cur_client);
         }
-
-        /* to remove
-        grant_request (sinfo, cur_client);
-        drop_request (cur_client);
-        */
     } /* for */
 
-    /* TODO: auctions */
+    /* TODO: check order of auctions and other requests. */
+    buy_raw_auction (sinfo->buy_raw);
+    sinfo->buy_raw = NULL;
+    sell_prod_auction (sinfo->sell_prod);
+    sinfo->sell_prod = NULL;
+
+    for (cur_client = sinfo->first_client;
+        cur_client != NULL;
+        cur_client = cur_client->next)
+    {
+        grant_requests (cur_client);
+    }
 }
