@@ -90,12 +90,18 @@ typedef enum game_state {
     G_ST_IN_GAME
 } game_state;
 
-typedef struct market_request {
-    struct market_request *next;
+typedef struct request {
+    struct request *next;
     client_info *client;
     unsigned int count;
+} request;
+
+typedef struct request_group {
+    struct request_group *next;
     unsigned int cost;
-} market_request;
+    unsigned int req_count;
+    request *first_req;
+} request_group;
 
 typedef struct server_info {
     int listening_port;
@@ -109,9 +115,9 @@ typedef struct server_info {
     unsigned int clients_count;
     game_state state;
     unsigned int step;
-    unsigned int market_level:3; /* [0-4] */
-    market_request *buy_raw;
-    market_request *sell_prod;
+    unsigned int level:3; /* [0-4] */
+    request_group *buy_raw;
+    request_group *sell_prod;
 } server_info;
 
 void unregister_client (server_info *sinfo,

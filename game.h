@@ -18,13 +18,6 @@
 #define MAKE_FACTORY_FIRST_HALF 2500
 #define MAKE_FACTORY_SECOND_HALF 2500
 
-#if 0
-typedef enum market_request_type {
-    BUY_RAW_REQUEST,
-    SELL_PROD_REUEST
-} market_request_type;
-#endif
-
 void new_game_data (server_info *sinfo);
 void new_client_game_data (client_info *client);
 

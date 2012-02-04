@@ -5,6 +5,7 @@ void new_game_data (server_info *sinfo)
     sinfo->clients_count = 0;
     sinfo->state = G_ST_WAIT_CLIENTS;
     sinfo->step = 0;
+    sinfo->level = 2;
     sinfo->buy_raw = NULL;
     sinfo->sell_prod = NULL;
 }
@@ -34,75 +35,125 @@ void new_client_game_data (client_info *client)
     drop_request (client);
 }
 
-market_request *new_market_request (client_info *client,
-    unsigned int count, unsigned int cost)
+request *new_request (client_info *client,
+    unsigned int count)
 {
-    market_request *req = (market_request *)
-        malloc (sizeof (market_request));
+    request *req = (request *) malloc (sizeof (request));
     req->next = NULL;
     req->client = client;
     req->count = count;
-    req->cost = cost;
     return req;
 }
 
-void add_buy_raw_request (server_info *sinfo, market_request *req)
+request_group *new_request_group (unsigned int cost)
 {
-    market_request *cur, *next;
+    request_group *req_group = (request_group *)
+        malloc (sizeof (request_group));
+    req_group->next = NULL;
+    req_group->cost = cost;
+    req_group->req_count = 0;
+    req_group->first_req = NULL;
+    return req_group;
+}
+
+/* Search request (buy raw) group with delivered cost.
+ * If group not found, then make it and return. */
+request_group *search_buy_raw_group (server_info *sinfo,
+    unsigned int cost)
+{
+    request_group *cur, *next, *tmp;
 
     if (sinfo->buy_raw == NULL) {
-        sinfo->buy_raw = req;
-        return;
+        sinfo->buy_raw = new_request_group (cost);
+        return sinfo->buy_raw;
     }
 
-    if (req->cost >= sinfo->buy_raw->cost) {
-        req->next = sinfo->buy_raw;
-        sinfo->buy_raw = req;
-        return;
+    if (cost > sinfo->buy_raw->cost) {
+        tmp = new_request_group (cost);
+        tmp->next = sinfo->buy_raw;
+        sinfo->buy_raw = tmp;
+        return sinfo->buy_raw;
+    } else if (cost == sinfo->buy_raw->cost) {
+        return sinfo->buy_raw;
     }
 
     cur = sinfo->buy_raw;
 
     do {
         next = cur->next;
-        if (next == NULL || req->cost >= next->cost)
+
+        if (next == NULL || cost > next->cost)
         {
-            req->next = next;
-            cur->next = req;
-            return;
+            tmp = new_request_group (cost);
+            tmp->next = next;
+            cur->next = tmp;
+            return tmp;
+        } else if (cost == next->cost) {
+            return next;
         }
+
         cur = next;
     } while (1);
 }
 
-void add_sell_prod_request (server_info *sinfo, market_request *req)
+/* Search request (sell production) group with delivered cost.
+ * If group not found, then make it and return. */
+request_group *search_sell_prod_group (server_info *sinfo,
+    unsigned int cost)
 {
-    market_request *cur, *next;
+    request_group *cur, *next, *tmp;
 
     if (sinfo->sell_prod == NULL) {
-        sinfo->sell_prod = req;
-        return;
+        sinfo->sell_prod = new_request_group (cost);
+        return sinfo->sell_prod;
     }
 
-    if (req->cost <= sinfo->sell_prod->cost) {
-        req->next = sinfo->sell_prod;
-        sinfo->sell_prod = req;
-        return;
+    if (cost < sinfo->sell_prod->cost) {
+        tmp = new_request_group (cost);
+        tmp->next = sinfo->sell_prod;
+        sinfo->sell_prod = tmp;
+        return sinfo->sell_prod;
+    } else if (cost == sinfo->sell_prod->cost) {
+        return sinfo->sell_prod;
     }
 
     cur = sinfo->sell_prod;
 
     do {
         next = cur->next;
-        if (next == NULL || req->cost <= next->cost)
+
+        if (next == NULL || cost < next->cost)
         {
-            req->next = next;
-            cur->next = req;
-            return;
+            tmp = new_request_group (cost);
+            tmp->next = next;
+            cur->next = tmp;
+            return tmp;
+        } else if (cost == next->cost) {
+            return next;
         }
+
         cur = next;
     } while (1);
+}
 
+void add_buy_raw_request (server_info *sinfo,
+    unsigned int cost, request *req)
+{
+    request_group *group = search_buy_raw_group (sinfo, cost);
+
+    req->next = group->first_req;
+    group->first_req = req;
+    ++(group->req_count);
+}
+
+void add_sell_prod_request (server_info *sinfo,
+    unsigned int cost, request *req)
+{
+    request_group *group = search_sell_prod_group (sinfo, cost);
+
+    req->next = group->first_req;
+    group->first_req = req;
+    ++(group->req_count);
 }
 
 #ifndef DAEMON
@@ -395,11 +446,11 @@ void do_cmd_buy (server_info *sinfo, client_info *client,
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
-    market_request *req;
+    request *req;
 
-    /* TODO: check values in dependence on market_level. */
-    req = new_market_request (client, count, cost);
-    add_buy_raw_request (sinfo, req);
+    /* TODO: check values in dependence on level. */
+    req = new_request (client, count);
+    add_buy_raw_request (sinfo, cost, req);
 
     write (client->fd, msg_request_stored,
         sizeof (msg_request_stored) - 1);
@@ -410,11 +461,11 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
-    market_request *req;
+    request *req;
 
-    /* TODO: check values in dependence on market_level. */
-    req = new_market_request (client, count, cost);
-    add_sell_prod_request (sinfo, req);
+    /* TODO: check values in dependence on level. */
+    req = new_request (client, count);
+    add_sell_prod_request (sinfo, cost, req);
 
     write (client->fd, msg_request_stored,
         sizeof (msg_request_stored) - 1);
@@ -603,11 +654,12 @@ void process_client_bankrupt (server_info *sinfo, client_info *client)
     free (client);
 }
 
-void buy_raw_one_group (market_request *req)
+#if 0
+void buy_raw_one_group (request *req)
 {
-    market_request *first_in_group = req;
+    request *first_in_group = req;
     unsigned int group_size = 0;
-    market_request *next;
+    request *next;
     unsigned int random_from_group;
 
     while (req != NULL) {
@@ -626,14 +678,81 @@ void buy_raw_one_group (market_request *req)
 
     /* TODO: remove request form list. */
 }
+#endif
 
-void buy_raw_auction (market_request *req)
+/* Frees all requests in group, group and returns
+ * next group in list. */
+request_group *free_and_get_next_group (request_group *group)
 {
-    /* TODO */
-    while (req != NULL)
+    request_group *next_group = group->next;
+    request *cur_req, *next_req;
+
+    /* frees all requests in group. */
+    cur_req = group->first_req;
+    free (group);
+
+    while (cur_req != NULL) {
+        next_req = cur_req->next;
+        free (cur_req);
+        cur_req = next_req;
+    }
+
+    return next_group;
 }
 
-void sell_prod_auction (market_request *req)
+void buy_raw_auction (server_info *sinfo)
+{
+    /* TODO: bank_raw_count */
+    int bank_raw_count = 6;
+    request_group *group = sinfo->buy_raw;
+    request *req, *prev_req;
+    int random;
+
+    while (group != NULL) {
+        while (group->req_count != 0) {
+            req = group->first_req;
+
+            /* Get random request (req) from group. */
+            random = (int) (((double) (group->req_count - 1)) * rand ()
+                / (RAND_MAX + 1.0)); /* [0; (group->req_count - 1)] */
+            prev_req = NULL;
+            while (random != 0) {
+                prev_req = req;
+                req = req->next;
+                --random;
+            }
+
+            if (bank_raw_count < req->count) {
+                req->client->raw_count += bank_raw_count;
+                bank_raw_count = 0;
+            } else {
+                bank_raw_count -= req->count;
+                req->client->raw_count += req->count;
+                if (prev_req == NULL) {
+                    group->first_req = req->next;
+                } else {
+                    prev_req = req->next;
+                }
+                free (req);
+                --(group->req_count);
+            }
+
+            if (bank_raw_count == 0) {
+                goto free_groups;
+            }
+        } /* while by requests. */
+
+        group = free_and_get_next_group (group);
+    } /* while by groups. */
+
+free_groups:
+    while (group != NULL) {
+        group = free_and_get_next_group (group);
+    }
+    sinfo->buy_raw = NULL;
+}
+
+void sell_prod_auction (server_info *sinfo)
 {
     /* TODO */
 }
@@ -684,10 +803,8 @@ void game_process_next_step (server_info *sinfo)
     } /* for */
 
     /* TODO: check order of auctions and other requests. */
-    buy_raw_auction (sinfo->buy_raw);
-    sinfo->buy_raw = NULL;
-    sell_prod_auction (sinfo->sell_prod);
-    sinfo->sell_prod = NULL;
+    buy_raw_auction (sinfo);
+    sell_prod_auction (sinfo);
 
     for (cur_client = sinfo->first_client;
         cur_client != NULL;
