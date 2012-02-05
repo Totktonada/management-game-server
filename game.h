@@ -10,6 +10,11 @@
 #include "utils.h"
 #include "main.h"
 
+#define START_MONEY 10000
+#define START_RAW_COUNT 4
+#define START_PROD_COUNT 2
+#define START_FACTORY_COUNT 2
+
 #define RAW_EXPENSES 300
 #define PROD_EXPENSES 500
 #define FACTORY_EXPENSES 1000

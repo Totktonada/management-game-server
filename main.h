@@ -70,15 +70,8 @@ typedef struct client_info {
     /* Requests */
     unsigned int build_factory_count;
     unsigned int make_prod_count;
-#if 0
-    unsigned int buy_raw_count;
-    unsigned int buy_raw_cost;
-    unsigned int sell_prod_count;
-    unsigned int sell_prod_cost;
-#endif
-    /* Building factories */
-    /* Count of 1, 2, 3, 4 month old
-     * factories. */
+    /* Building factories. Count of
+     * 1, 2, 3, 4 month old factories. */
     unsigned int building_factory_1;
     unsigned int building_factory_2;
     unsigned int building_factory_3;
@@ -104,6 +97,7 @@ typedef struct request_group {
 } request_group;
 
 typedef struct server_info {
+    /* Connecting data. */
     int listening_port;
     int listening_socket;
     fd_set read_fds;
@@ -111,11 +105,11 @@ typedef struct server_info {
     client_info *first_client;
     client_info *last_client;
     int expected_clients;
-    /* Game data */
+    /* Game data. */
     unsigned int clients_count;
     game_state state;
     unsigned int step;
-    unsigned int level:3; /* [0-4] */
+    unsigned int level; /* [0-4] */
     request_group *buy_raw;
     request_group *sell_prod;
 } server_info;

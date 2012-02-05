@@ -51,3 +51,10 @@ int number_to_str (char *buf, int number)
     buf[i] = '\0';
     return i;
 }
+
+/* Get random number form 0 to max_value (inclusive). */
+unsigned int get_random (unsigned int max_value)
+{
+    return (unsigned int) (max_value * rand ()
+        / (RAND_MAX + 1.0));
+}

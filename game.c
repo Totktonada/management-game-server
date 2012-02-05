@@ -1,5 +1,30 @@
 #include "game.h"
 
+/* Static data. */
+/* ============ */
+
+/* In massive (implicatium_value * 2) */
+const unsigned int raw_count_per_player[5] =
+    { 2, 3, 4, 5, 6 };
+const unsigned int prod_count_per_player[5] =
+    { 6, 5, 4, 3, 2 };
+
+const unsigned int min_raw_price[5] =
+    { 800, 650, 500, 400, 300 };
+const unsigned int max_prod_price[5] =
+    { 6500, 6000, 5500, 5000, 4500 };
+
+/* In massive (implicatium_value * 12) */
+/* Sum by string is 12. */
+const unsigned int level_change_probability[5][5] = {
+    { 4, 4, 2, 1, 1 },
+    { 3, 4, 3, 1, 1 },
+    { 1, 3, 4, 3, 1 },
+    { 1, 1, 3, 4, 3 },
+    { 1, 1, 2, 4, 4 }
+};
+/* ============ */
+
 void new_game_data (server_info *sinfo)
 {
     sinfo->clients_count = 0;
@@ -20,10 +45,10 @@ void new_client_game_data (client_info *client)
 {
     /* Nick would be changed in process_new_client () in "main.c". */
     client->nick = NULL;
-    client->money = 10000;
-    client->raw_count = 4;
-    client->prod_count = 2;
-    client->factory_count = 2;
+    client->money = START_MONEY;
+    client->raw_count = START_RAW_COUNT;
+    client->prod_count = START_PROD_COUNT;
+    client->factory_count = START_FACTORY_COUNT;
     client->step_completed = 0; /* Step not completed */
 
     drop_request (client);
@@ -150,6 +175,26 @@ void add_sell_prod_request (server_info *sinfo,
     ++(group->req_count);
 }
 
+/* Calculate raw count for current market level.
+ * This function used sinfo->clients_count for calculation,
+ * therefore it returns correct value for current step
+ * only before or after clients to go bankrupt. */
+unsigned int get_market_raw_count (server_info *sinfo)
+{
+    return (int) ((raw_count_per_player[sinfo->level]
+        * sinfo->clients_count) / 2);
+}
+
+/* Calculate production need count for current market level.
+ * This function used sinfo->clients_count for calculation,
+ * therefore it returns correct value for current step
+ * only before or after clients to go bankrupt. */
+unsigned int get_market_prod_count (server_info *sinfo)
+{
+    return (int) ((prod_count_per_player[sinfo->level]
+        * sinfo->clients_count) / 2);
+}
+
 #ifndef DAEMON
 void print_cmd (command *cmd)
 {
@@ -192,13 +237,40 @@ void print_cmd (command *cmd)
 }
 #endif
 
-void write_number (int write_fd, unsigned int number)
+/* Print number to descriptor write_fd.
+ * If (newline != 0), then write newline after number. */
+void write_number (int write_fd, unsigned int number, int newline)
 {
+    char msg_newline[] = "\n";
+
     /* See comment to number_to_str (). */
     char *buf = (char *) malloc (11 * sizeof (char));
     int size = number_to_str (buf, number);
     write (write_fd, buf, size);
     free (buf);
+
+    if (newline)
+        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+}
+
+/* Print (number / 2) to descriptor write_fd.
+ * If (newline != 0), then write newline after number. */
+void write_number_half (int write_fd, unsigned int number, int newline)
+{
+    char msg_newline[] = "\n";
+    char msg_dot_five[] = ".5";
+
+    /* See comment to number_to_str (). */
+    char *buf = (char *) malloc (11 * sizeof (char));
+    int size = number_to_str (buf, (unsigned int) (number / 2));
+    write (write_fd, buf, size);
+    free (buf);
+
+    if ((number % 2) == 1)
+        write (write_fd, msg_dot_five, sizeof (msg_dot_five) - 1);
+
+    if (newline)
+        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
 }
 
 void do_cmd_help (int write_fd, char *cmd_name)
@@ -284,24 +356,76 @@ void do_cmd_nick (client_info *client, char *nick)
 
 void write_common_information (int write_fd, server_info *sinfo)
 {
-    char msg_newline[] = "\n";
     char msg_cl_count[] = "Connected clients count: ";
     char msg_step[] = "Step: ";
+    char msg_market_level[] = "Market level: ";
+    char msg_market_info_head[] = "----Market info----\n";
+    char msg_numbers_separator_1[] = " / ";
+    char msg_market_raw_count[] = "\
+Raw on market (in all / per player): ";
+    char msg_min_raw_price[] = "Min raw price: ";
+    char msg_market_prod_count[] = "\
+Production need on market (in all / per player): ";
+    char msg_max_prod_price[] = "Max production price: ";
+    char msg_level_change_probability[] = "\
+Level change probability (n / 12): ";
+    char msg_numbers_separator_2[] = ", ";
+    char msg_newline[] = "\n";
+    int i;
 
     write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
-    write_number (write_fd, sinfo->clients_count);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, sinfo->clients_count, 1);
 
     write (write_fd, msg_step, sizeof (msg_step) - 1);
-    write_number (write_fd, sinfo->step);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, sinfo->step, 1);
+
+    write (write_fd, msg_market_level, sizeof (msg_market_level) - 1);
+    write_number (write_fd, sinfo->level + 1, 1); /* This is index! */
+
+    write (write_fd, msg_market_info_head,
+        sizeof (msg_market_info_head) - 1);
+
+    write (write_fd, msg_market_raw_count,
+        sizeof (msg_market_raw_count) - 1);
+    write_number (write_fd, get_market_raw_count (sinfo), 0);
+    write (write_fd, msg_numbers_separator_1,
+        sizeof (msg_numbers_separator_1) - 1);
+    write_number_half (write_fd,
+        raw_count_per_player[sinfo->level], 1);
+
+    write (write_fd, msg_min_raw_price, sizeof (msg_min_raw_price) - 1);
+    write_number (write_fd, min_raw_price[sinfo->level], 1);
+
+    write (write_fd, msg_market_prod_count,
+        sizeof (msg_market_prod_count) - 1);
+    write_number (write_fd, get_market_prod_count (sinfo), 0);
+    write (write_fd, msg_numbers_separator_1,
+        sizeof (msg_numbers_separator_1) - 1);
+    write_number_half (write_fd,
+        prod_count_per_player[sinfo->level], 1);
+
+    write (write_fd, msg_max_prod_price, sizeof (msg_max_prod_price) - 1);
+    write_number (write_fd, max_prod_price[sinfo->level], 1);
+
+    write (write_fd, msg_level_change_probability,
+        sizeof (msg_level_change_probability) - 1);
+    for (i = 0; i < 5; ++i) {
+        write_number (write_fd,
+            level_change_probability[sinfo->level][i], 0);
+        if (i < 4) {
+            write (write_fd, msg_numbers_separator_2,
+                sizeof (msg_numbers_separator_2) - 1);
+        } else {
+            write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+        }
+    }
 }
 
 /* TODO: nick -> username ? */
 void write_client_information (int write_fd, client_info *client)
 {
     char msg_newline[] = "\n";
-    char msg_client_info_head[] = "-------------------\n";
+    char msg_client_info_head[] = "----Client info----\n";
     char msg_nick[] = "Username: ";
     char msg_money[] = "Money: ";
     char msg_raw_count[] = "Raws: ";
@@ -317,27 +441,22 @@ void write_client_information (int write_fd, client_info *client)
     write (write_fd, msg_newline, sizeof (msg_newline) - 1);
 
     write (write_fd, msg_money, sizeof (msg_money) - 1);
-    write_number (write_fd, client->money);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, client->money, 1);
 
     write (write_fd, msg_raw_count, sizeof (msg_raw_count) - 1);
-    write_number (write_fd, client->raw_count);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, client->raw_count, 1);
 
     write (write_fd, msg_prod_count, sizeof (msg_prod_count) - 1);
-    write_number (write_fd, client->prod_count);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, client->prod_count, 1);
 
     write (write_fd, msg_factory_count,
         sizeof (msg_factory_count) - 1);
-    write_number (write_fd, client->factory_count);
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write_number (write_fd, client->factory_count, 1);
 
     write (write_fd, msg_step_completed,
         sizeof (msg_step_completed) - 1);
-    write_number (write_fd, client->step_completed);
+    write_number (write_fd, client->step_completed, 1);
     /* TODO: write "true" or "false". */
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
 
     /* TODO: write information about requests */
 }
@@ -440,9 +559,24 @@ void do_cmd_buy (server_info *sinfo, client_info *client,
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
+    char msg_cost_out_of_range[] = "\
+Your cost is out of range. See information by \"status\" command.\n";
+    char msg_count_out_of_range[] = "\
+Your count is out of range. See information by \"status\" command.\n";
     request *req;
 
-    /* TODO: check values in dependence on level. */
+    if (count > get_market_raw_count (sinfo)) {
+        write (client->fd, msg_count_out_of_range,
+            sizeof (msg_count_out_of_range) - 1);
+        return;
+    }
+
+    if (cost < min_raw_price[sinfo->level]) {
+        write (client->fd, msg_cost_out_of_range,
+            sizeof (msg_cost_out_of_range) - 1);
+        return;
+    }
+
     req = new_request (client, count);
     add_buy_raw_request (sinfo, cost, req);
 
@@ -455,9 +589,34 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
 {
     char msg_request_stored[] = "\
 Your request stored to processing on end of step.\n";
+    char msg_cost_out_of_range[] = "\
+Your cost is out of range. See information by \"status\" command.\n";
+    char msg_count_out_of_range[] = "\
+Your count is out of range. See information by \"status\" command.\n";
+    char msg_have_not_prod[] = "\
+Your have not so much productions.\
+ See information by \"status your_username\" command.\n";
+
     request *req;
 
-    /* TODO: check values in dependence on level. */
+    if (count > get_market_prod_count (sinfo)) {
+        write (client->fd, msg_count_out_of_range,
+            sizeof (msg_count_out_of_range) - 1);
+        return;
+    }
+
+    if (count > client->prod_count) {
+        write (client->fd, msg_have_not_prod,
+            sizeof (msg_have_not_prod) - 1);
+        return;
+    }
+
+    if (cost > max_prod_price[sinfo->level]) {
+        write (client->fd, msg_cost_out_of_range,
+            sizeof (msg_cost_out_of_range) - 1);
+        return;
+    }
+
     req = new_request (client, count);
     add_sell_prod_request (sinfo, cost, req);
 
@@ -682,9 +841,8 @@ request *get_request (request_group **group_pointer,
     *cost_pointer = group->cost;
 
     /* Get random request (req) from group. */
-    random = (int) (((double) (group->req_count - 1)) * rand ()
-        / (RAND_MAX + 1.0)); /* [0; (group->req_count - 1)] */
-
+    /* random in [0; (req_count - 1)] */
+    random = get_random (group->req_count - 1);
     prev_req = NULL;
 
     while (random != 0) {
@@ -709,21 +867,20 @@ request *get_request (request_group **group_pointer,
     return req;
 }
 
-void buy_raw_auction (server_info *sinfo)
+void buy_raw_auction (server_info *sinfo,
+    unsigned int market_raw_count)
 {
     request *req;
     request_group *group = sinfo->buy_raw;
     unsigned int real_buy_raw_count, cost;
-    /* TODO: bank_raw_count */
-    unsigned int bank_raw_count = 6;
 
-    while (bank_raw_count != 0 && group != NULL) {
+    while (market_raw_count != 0 && group != NULL) {
         req = get_request (&group, &cost);
 
-        real_buy_raw_count = MIN (bank_raw_count, req->count);
+        real_buy_raw_count = MIN (market_raw_count, req->count);
         req->client->raw_count += real_buy_raw_count;
         req->client->money -= (real_buy_raw_count * cost);
-        bank_raw_count -= real_buy_raw_count;
+        market_raw_count -= real_buy_raw_count;
     }
 
     while (group != NULL) {
@@ -733,21 +890,22 @@ void buy_raw_auction (server_info *sinfo)
     sinfo->buy_raw = NULL;
 }
 
-void sell_prod_auction (server_info *sinfo)
+void sell_prod_auction (server_info *sinfo,
+    unsigned int market_prod_count)
 {
     request *req;
     request_group *group = sinfo->sell_prod;
     unsigned int real_sell_prod_count, cost;
-    /* TODO: bank_prod_demand */
-    unsigned int bank_prod_demand = 6;
 
-    while (bank_prod_demand != 0 && group != NULL) {
+    while (market_prod_count != 0 && group != NULL) {
         req = get_request (&group, &cost);
 
-        real_sell_prod_count = MIN (bank_prod_demand, req->count);
+        real_sell_prod_count = MIN (market_prod_count, req->count);
+        free (req);
+
         req->client->prod_count -= real_sell_prod_count;
         req->client->money += (real_sell_prod_count * cost);
-        bank_prod_demand -= real_sell_prod_count;
+        market_prod_count -= real_sell_prod_count;
     }
 
     while (group != NULL) {
@@ -758,13 +916,19 @@ void sell_prod_auction (server_info *sinfo)
 }
 
 /* Make production and build factories. */
-void grant_requests (client_info *client)
+void grant_make_prod_request (client_info *client)
 {
     /* TODO: messages for clients. */
 
     /* Make production. */
     client->raw_count -= client->make_prod_count;
+    client->prod_count += client->make_prod_count;
     client->money -= client->make_prod_count * MAKE_PROD_COST;
+}
+
+void grant_build_factories_request (client_info *client)
+{
+    /* TODO: messages for clients. */
 
     /* Build factories. */
 #if 0
@@ -784,11 +948,28 @@ void grant_requests (client_info *client)
         client->building_factory_4 * MAKE_FACTORY_SECOND_HALF;
 }
 
+/* Change sinfo->level depending on level_change_probability . */
+void change_level (server_info *sinfo)
+{
+    /* Why 11? See comment to level_change_probability . */
+    int random = 1 + get_random (11); /* [1-12] */
+    int sum = 0;
+    int i;
+
+    for (i = 0; i < 5; ++i) {
+        sum += level_change_probability[sinfo->level][i];
+        if (sum >= random) {
+            sinfo->level = i;
+            return;
+        }
+    }
+}
+
 void game_process_next_step (server_info *sinfo)
 {
     client_info *cur_client;
-
-    ++(sinfo->step);
+    unsigned int market_raw_count = get_market_raw_count (sinfo);
+    unsigned int market_prod_count = get_market_prod_count (sinfo);
 
     for (cur_client = sinfo->first_client;
         cur_client != NULL;
@@ -803,16 +984,20 @@ void game_process_next_step (server_info *sinfo)
     } /* for */
 
     /* TODO: check order of auctions and other requests. */
-    buy_raw_auction (sinfo);
-    sell_prod_auction (sinfo);
+    buy_raw_auction (sinfo, market_raw_count);
+    sell_prod_auction (sinfo, market_prod_count);
 
     for (cur_client = sinfo->first_client;
         cur_client != NULL;
         cur_client = cur_client->next)
     {
-        grant_requests (cur_client);
+        grant_make_prod_request (cur_client);
+        grant_build_factories_request (cur_client);
         if (cur_client->money < 0) {
             process_client_bankrupt (sinfo, cur_client);
         }
-    }
+    } /* for */
+
+    change_level (sinfo);
+    ++(sinfo->step);
 }
