@@ -14,12 +14,6 @@ void drop_request (client_info *client)
 {
     client->build_factory_count = 0;
     client->make_prod_count = 0;
-#if 0
-    client->buy_raw_count = 0;
-    client->buy_raw_cost = 0;
-    client->sell_prod_count = 0;
-    client->sell_prod_cost = 0;
-#endif
 }
 
 void new_client_game_data (client_info *client)
@@ -654,32 +648,6 @@ void process_client_bankrupt (server_info *sinfo, client_info *client)
     free (client);
 }
 
-#if 0
-void buy_raw_one_group (request *req)
-{
-    request *first_in_group = req;
-    unsigned int group_size = 0;
-    request *next;
-    unsigned int random_from_group;
-
-    while (req != NULL) {
-        next = req->next;
-        ++group_size;
-        if (next == NULL || next->cost != req->cost)
-            break;
-        req = next;
-    }
-
-    random_from_group = /* TODO */;
-
-    for (i = 0; i < random_from_group; ++i)
-        req = req->next;
-    make_request (req);
-
-    /* TODO: remove request form list. */
-}
-#endif
-
 /* Frees all requests in group, group and returns
  * next group in list. */
 request_group *free_and_get_next_group (request_group *group)
@@ -700,61 +668,93 @@ request_group *free_and_get_next_group (request_group *group)
     return next_group;
 }
 
-void buy_raw_auction (server_info *sinfo)
+/* Returns actual request, move cost in this request group
+ * to (*cost_pointer).
+ * Remove request from list and remove empty group from list. */
+request *get_request (request_group **group_pointer,
+    unsigned int *cost_pointer)
 {
-    /* TODO: bank_raw_count */
-    int bank_raw_count = 6;
-    request_group *group = sinfo->buy_raw;
+    request_group *group = *group_pointer;
     request *req, *prev_req;
     int random;
 
-    while (group != NULL) {
-        while (group->req_count != 0) {
-            req = group->first_req;
+    req = group->first_req;
+    *cost_pointer = group->cost;
 
-            /* Get random request (req) from group. */
-            random = (int) (((double) (group->req_count - 1)) * rand ()
-                / (RAND_MAX + 1.0)); /* [0; (group->req_count - 1)] */
-            prev_req = NULL;
-            while (random != 0) {
-                prev_req = req;
-                req = req->next;
-                --random;
-            }
+    /* Get random request (req) from group. */
+    random = (int) (((double) (group->req_count - 1)) * rand ()
+        / (RAND_MAX + 1.0)); /* [0; (group->req_count - 1)] */
 
-            if (bank_raw_count < req->count) {
-                req->client->raw_count += bank_raw_count;
-                bank_raw_count = 0;
-            } else {
-                bank_raw_count -= req->count;
-                req->client->raw_count += req->count;
-                if (prev_req == NULL) {
-                    group->first_req = req->next;
-                } else {
-                    prev_req = req->next;
-                }
-                free (req);
-                --(group->req_count);
-            }
+    prev_req = NULL;
 
-            if (bank_raw_count == 0) {
-                goto free_groups;
-            }
-        } /* while by requests. */
+    while (random != 0) {
+        prev_req = req;
+        req = req->next;
+        --random;
+    }
 
-        group = free_and_get_next_group (group);
-    } /* while by groups. */
+    /* Remove request from list. */
+    if (prev_req == NULL) {
+        group->first_req = req->next;
+    } else {
+        prev_req = req->next;
+    }
 
-free_groups:
+    --(group->req_count);
+
+    if (group->req_count == 0) {
+        *group_pointer = free_and_get_next_group (group);
+    }
+
+    return req;
+}
+
+void buy_raw_auction (server_info *sinfo)
+{
+    request *req;
+    request_group *group = sinfo->buy_raw;
+    unsigned int real_buy_raw_count, cost;
+    /* TODO: bank_raw_count */
+    unsigned int bank_raw_count = 6;
+
+    while (bank_raw_count != 0 && group != NULL) {
+        req = get_request (&group, &cost);
+
+        real_buy_raw_count = MIN (bank_raw_count, req->count);
+        req->client->raw_count += real_buy_raw_count;
+        req->client->money -= (real_buy_raw_count * cost);
+        bank_raw_count -= real_buy_raw_count;
+    }
+
     while (group != NULL) {
         group = free_and_get_next_group (group);
     }
+
     sinfo->buy_raw = NULL;
 }
 
 void sell_prod_auction (server_info *sinfo)
 {
-    /* TODO */
+    request *req;
+    request_group *group = sinfo->sell_prod;
+    unsigned int real_sell_prod_count, cost;
+    /* TODO: bank_prod_demand */
+    unsigned int bank_prod_demand = 6;
+
+    while (bank_prod_demand != 0 && group != NULL) {
+        req = get_request (&group, &cost);
+
+        real_sell_prod_count = MIN (bank_prod_demand, req->count);
+        req->client->prod_count -= real_sell_prod_count;
+        req->client->money += (real_sell_prod_count * cost);
+        bank_prod_demand -= real_sell_prod_count;
+    }
+
+    while (group != NULL) {
+        group = free_and_get_next_group (group);
+    }
+
+    sinfo->sell_prod = NULL;
 }
 
 /* Make production and build factories. */
@@ -811,5 +811,8 @@ void game_process_next_step (server_info *sinfo)
         cur_client = cur_client->next)
     {
         grant_requests (cur_client);
+        if (cur_client->money < 0) {
+            process_client_bankrupt (sinfo, cur_client);
+        }
     }
 }

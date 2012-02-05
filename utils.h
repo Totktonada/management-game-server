@@ -6,6 +6,9 @@
 /* Case sensitive. */
 #define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
 
+#define MIN(n1, n2) (((n1) <= (n2)) ? (n1) : (n2))
+#define MAX(n1, n2) (((n1) >= (n2)) ? (n1) : (n2))
+
 #include "parser.h"
 
 type_of_cmd get_cmd_type (char *str);
