@@ -1004,9 +1004,12 @@ void game_process_next_step (server_info *sinfo)
         grant_make_prod_request (cur_client);
         grant_build_factories_request (cur_client);
         after_step_expenses (cur_client);
+
         if (cur_client->money < 0) {
             process_client_bankrupt (sinfo, cur_client);
         }
+
+        cur_client->step_completed = 0;
     } /* for */
 
     change_level (sinfo);
