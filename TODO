@@ -27,4 +27,4 @@
 
 * cmd [--help | -h | -?]
 
-* status [--common | -c]
+* status [--common | -c] или status [--market | -m]
