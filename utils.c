@@ -30,17 +30,14 @@ type_of_cmd get_cmd_type (char *str)
  * have size 11.
  * Returns:
  * size of string without '\0'. */
-int number_to_str (char *buf, int number)
+unsigned int number_to_str (char *buf, unsigned int number)
 {
     unsigned int i = 0;
     unsigned int del = 1;
 
     while (number / 10 >= del) {
         del *= 10;
-        ++i;
     }
-
-    i = 0;
 
     do {
         buf[i] = '0' + ((number / del) % 10);
