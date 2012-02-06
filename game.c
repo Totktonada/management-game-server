@@ -1,7 +1,7 @@
 #include "game.h"
 
-/* Static data. */
-/* ============ */
+/* Static data */
+/* =========== */
 
 /* In massive (implicatium_value * 2) */
 const unsigned int raw_count_per_player[5] =
@@ -23,7 +23,124 @@ const unsigned int level_change_probability[5][5] = {
     { 1, 1, 3, 4, 3 },
     { 1, 1, 2, 4, 4 }
 };
-/* ============ */
+
+/*   Messages  */
+/* =========== */
+
+/* Command help */
+const char msg_help_without_cmd[] = "\
+Available commands:\n\
+* help [command]\n\
+* nick [string]\n\
+* status [username | --all | -a]\n\
+* build count\n\
+* prod count\n\
+* buy count cost\n\
+* sell count cost\n\
+* turn\n\
+Command parser is case insensitive and have fun,\
+ when you type commands in uppercase.\n\
+";
+const char msg_cmd_help[] = "\
+help [command]\n\
+If have not argument, print available commands.\
+ If argument is command name, print short help\
+ about this command.\n\
+";
+const char msg_unknown_cmd[] = "\
+Wrong argument: typed command not found.\n\
+";
+
+/* Command nick */
+char msg_your_nickname[] = "\
+Your nickname: ";
+
+/* Common information */
+/* TODO: fix mishmash with little and large strigns. */
+char msg_cl_count[] = "\
+Connected clients count: ";
+char msg_step[] = "\
+Step: ";
+char msg_market_level[] = "\
+Market level: ";
+char msg_market_info_head[] = "\
+----Market info----\n";
+char msg_market_raw_count[] = "\
+Raw on market (in all / per player): ";
+char msg_min_raw_price[] = "\
+Min raw price: ";
+char msg_market_prod_count[] = "\
+Production need on market (in all / per player): ";
+char msg_max_prod_price[] = "\
+Max production price: ";
+char msg_level_change_probability[] = "\
+Level change probability (n / 12): ";
+
+/* Client information */
+char msg_client_info_head[] = "\
+----Client info----\n";
+char msg_nick[] = "\
+Username: ";
+char msg_money[] = "\
+Money: ";
+char msg_raw_count[] = "\
+Raws: ";
+char msg_prod_count[] = "\
+Productions: ";
+char msg_factory_count[] = "\
+Factories: ";
+char msg_is_step_completed[] = "\
+Step completed: ";
+
+/* Command status */
+char msg_client_not_found[] = "\
+Client with same username not found, try \"status --all\".\n";
+
+/* For requests. */
+char msg_request_stored[] = "\
+Okay! Your request stored to after-step processing.\n";
+
+/* For requests. Command prod. */
+char msg_too_few_factories[] = "\
+You have too few factories. Request rejected.\n\
+See information by \"status\" command.\n";
+
+/* For requests. Commands buy and sell. */
+char msg_cost_out_of_range[] = "\
+Your cost is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
+char msg_count_out_of_range[] = "\
+Your count is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
+char msg_have_not_prod[] = "\
+Your have not so much productions. Request rejected.\n\
+See information by \"status your_username\" command.\n";
+
+/* Command turn */
+char msg_step_completed[] = "\
+Step already completed, wait for other clients.\n";
+char msg_wait_clients[] = "\
+Server wait for full count of clients. Please wait.\n";
+
+/* Wrong command */
+const char msg_wrong_cmd[] = "\
+Wrong command. Try \"help\".\n";
+
+/* Command allowing */
+char msg_not_in_game[] = "\
+This command is forbidden before start the game.\n";
+
+/* Process client bankrupt */
+char msg_bankrupt[] = "\
+You are bankrupt!\n";
+
+/* Auxiliary messages */
+char msg_newline[] = "\n";
+char msg_dot_five[] = ".5";
+char msg_numbers_separator_1[] = " / ";
+char msg_numbers_separator_2[] = ", ";
+
+/* =========== */
 
 void new_game_data (server_info *sinfo)
 {
@@ -243,11 +360,10 @@ void print_cmd (command *cmd)
  * If (newline != 0), then write newline after number. */
 void write_number (int write_fd, unsigned int number, int newline)
 {
-    char msg_newline[] = "\n";
-
     /* Why 11? See comment to number_to_str (). */
     char *buf = (char *) malloc (11 * sizeof (char));
     int size = number_to_str (buf, number);
+
     write (write_fd, buf, size);
     free (buf);
 
@@ -259,12 +375,10 @@ void write_number (int write_fd, unsigned int number, int newline)
  * If (newline != 0), then write newline after number. */
 void write_number_half (int write_fd, unsigned int number, int newline)
 {
-    char msg_newline[] = "\n";
-    char msg_dot_five[] = ".5";
-
-    /* See comment to number_to_str (). */
+    /* Why 11? See comment to number_to_str (). */
     char *buf = (char *) malloc (11 * sizeof (char));
     int size = number_to_str (buf, (unsigned int) (number / 2));
+
     write (write_fd, buf, size);
     free (buf);
 
@@ -277,39 +391,17 @@ void write_number_half (int write_fd, unsigned int number, int newline)
 
 void do_cmd_help (int write_fd, char *cmd_name)
 {
-    const char buf_without_cmd[] = "\
-Available commands:\n\
-* help [command]\n\
-* nick [string]\n\
-* status [username | --all | -a]\n\
-* build count\n\
-* prod count\n\
-* buy count cost\n\
-* sell count cost\n\
-* turn\n\
-Command parser is case insensitive and have fun,\
- when you type commands in uppercase.\n\
-";
-    const char buf_cmd_help[] = "\
-help [command]\n\
-If have not argument, print available commands.\
- If argument is command name, print short help\
- about this command.\n\
-";
-    const char buf_unknown_cmd[] = "\
-Wrong argument: typed command not found.\n\
-";
     if (cmd_name == NULL) {
-        write (write_fd, buf_without_cmd,
-            sizeof (buf_without_cmd) - 1);
+        write (write_fd, msg_help_without_cmd,
+            sizeof (msg_help_without_cmd) - 1);
         return;
     }
 
     /* TODO */
     switch (get_cmd_type (cmd_name)) {
     case CMD_HELP:
-        write (write_fd, buf_cmd_help,
-            sizeof (buf_cmd_help) - 1);
+        write (write_fd, msg_cmd_help,
+            sizeof (msg_cmd_help) - 1);
         break;
     case CMD_NICK:
         break;
@@ -327,8 +419,8 @@ Wrong argument: typed command not found.\n\
     case CMD_TURN:
         break;
     case CMD_WRONG:
-        write (write_fd, buf_unknown_cmd,
-            sizeof (buf_unknown_cmd) - 1);
+        write (write_fd, msg_unknown_cmd,
+            sizeof (msg_unknown_cmd) - 1);
         break;
     case CMD_EMPTY:
     case CMD_PROTOCOL_PARSE_ERROR:
@@ -339,11 +431,6 @@ Wrong argument: typed command not found.\n\
 
 void do_cmd_nick (client_info *client, char *nick)
 {
-    char msg_your_nickname[] = "\
-Your nickname: ";
-
-    char msg_newline[] = "\n";
-
     if (nick == NULL) {
         write (client->fd, msg_your_nickname,
             sizeof (msg_your_nickname) - 1);
@@ -360,29 +447,6 @@ Your nickname: ";
 
 void write_common_information (int write_fd, server_info *sinfo)
 {
-    /* TODO: fix mishmash with little and large strigns. */
-    char msg_cl_count[] = "\
-Connected clients count: ";
-    char msg_step[] = "\
-Step: ";
-    char msg_market_level[] = "\
-Market level: ";
-    char msg_market_info_head[] = "\
-----Market info----\n";
-    char msg_market_raw_count[] = "\
-Raw on market (in all / per player): ";
-    char msg_min_raw_price[] = "\
-Min raw price: ";
-    char msg_market_prod_count[] = "\
-Production need on market (in all / per player): ";
-    char msg_max_prod_price[] = "\
-Max production price: ";
-    char msg_level_change_probability[] = "\
-Level change probability (n / 12): ";
-
-    char msg_numbers_separator_1[] = " / ";
-    char msg_numbers_separator_2[] = ", ";
-    char msg_newline[] = "\n";
     int i;
 
     write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
@@ -436,23 +500,6 @@ Level change probability (n / 12): ";
 /* TODO: nick -> username ? */
 void write_client_information (int write_fd, client_info *client)
 {
-    char msg_client_info_head[] = "\
-----Client info----\n";
-    char msg_nick[] = "\
-Username: ";
-    char msg_money[] = "\
-Money: ";
-    char msg_raw_count[] = "\
-Raws: ";
-    char msg_prod_count[] = "\
-Productions: ";
-    char msg_factory_count[] = "\
-Factories: ";
-    char msg_step_completed[] = "\
-Step completed: ";
-
-    char msg_newline[] = "\n";
-
     write (write_fd, msg_client_info_head,
         sizeof (msg_client_info_head) - 1);
 
@@ -473,8 +520,8 @@ Step completed: ";
         sizeof (msg_factory_count) - 1);
     write_number (write_fd, client->factory_count, 1);
 
-    write (write_fd, msg_step_completed,
-        sizeof (msg_step_completed) - 1);
+    write (write_fd, msg_is_step_completed,
+        sizeof (msg_is_step_completed) - 1);
     write_number (write_fd, client->step_completed, 1);
     /* TODO: write "true" or "false". */
 
@@ -504,8 +551,6 @@ client_info *get_client_by_nick (client_info *first_client,
 void do_cmd_status (server_info *sinfo, client_info *client,
     char *nick)
 {
-    char msg_client_not_found[] = "\
-Client with same username not found, try \"status --all\".\n";
     int write_info_for_all_clients = 0;
     int write_info_for_myself = 0;
     client_info *pointed_client = NULL;
@@ -544,9 +589,6 @@ Client with same username not found, try \"status --all\".\n";
 
 void do_cmd_build (client_info *client, int count)
 {
-    char msg_request_stored[] = "\
-Okay! Your request stored to after-step processing.\n";
-
     /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
@@ -556,12 +598,6 @@ Okay! Your request stored to after-step processing.\n";
 
 void do_cmd_prod (client_info *client, int count)
 {
-    char msg_request_stored[] = "\
-Okay! Your request stored to after-step processing.\n";
-    char msg_too_few_factories[] = "\
-You have too few factories. Request rejected.\n\
-See information by \"status\" command.\n";
-
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
         write (client->fd, msg_too_few_factories,
@@ -578,14 +614,6 @@ See information by \"status\" command.\n";
 void do_cmd_buy (server_info *sinfo, client_info *client,
     int count, int cost)
 {
-    char msg_request_stored[] = "\
-Okay! Your request stored to after-step processing.\n";
-    char msg_cost_out_of_range[] = "\
-Your cost is out of range. Request rejected.\n\
-See information by \"status\" command.\n";
-    char msg_count_out_of_range[] = "\
-Your count is out of range. Request rejected.\n\
-See information by \"status\" command.\n";
     request *req;
 
     if (count > get_market_raw_count (sinfo)) {
@@ -610,18 +638,6 @@ See information by \"status\" command.\n";
 void do_cmd_sell (server_info *sinfo, client_info *client,
     int count, int cost)
 {
-    char msg_request_stored[] = "\
-Okay! Your request stored to after-step processing.\n";
-    char msg_cost_out_of_range[] = "\
-Your cost is out of range. Request rejected.\n\
-See information by \"status\" command.\n";
-    char msg_count_out_of_range[] = "\
-Your count is out of range. Request rejected.\n\
-See information by \"status\" command.\n";
-    char msg_have_not_prod[] = "\
-Your have not so much productions. Request rejected.\n\
-See information by \"status your_username\" command.\n";
-
     request *req;
 
     if (count > get_market_prod_count (sinfo)) {
@@ -651,10 +667,6 @@ See information by \"status your_username\" command.\n";
 
 void do_cmd_turn (server_info *sinfo, client_info *client)
 {
-    char msg_step_completed[] = "\
-Step already completed, wait for other clients.\n";
-    char msg_wait_clients[] = "\
-Server wait for full count of clients. Please wait.\n";
     client_info *cur_client;
     int all_clients_step_completed;
 
@@ -690,9 +702,6 @@ Server wait for full count of clients. Please wait.\n";
 
 void do_cmd_wrong (int write_fd)
 {
-    const char msg_wrong_cmd[] = "\
-Wrong command. Try \"help\".\n";
-
     /* Write string without '\0'. */
     write (write_fd, msg_wrong_cmd, sizeof (msg_wrong_cmd) - 1);
 }
@@ -703,9 +712,6 @@ Wrong command. Try \"help\".\n";
  * 1, otherwise (command allowed). */
 int allow_command (server_info *sinfo, int write_fd, command *cmd)
 {
-    char msg_not_in_game[] = "\
-This command is forbidden before start the game.\n";
-
     switch (cmd->type) {
     case CMD_EMPTY:
     case CMD_HELP:
@@ -814,9 +820,6 @@ void after_step_expenses (client_info *client)
 
 void process_client_bankrupt (server_info *sinfo, client_info *client)
 {
-    char msg_bankrupt[] = "\
-You are bankrupt!\n";
-
     /* TODO: maybe, do not disconnect client and permit only
      * "help" and "status" commands. */
     /* TODO: messages about this event for all clients. */
