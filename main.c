@@ -2,7 +2,7 @@
 
 char *first_vacant_nick (client_info *first_client)
 {
-    /* See comment to number_to_str ().
+    /* Why 12? See comment to number_to_str ().
      * First position reserved for 'p' symbol. */
     char *buf = (char *) malloc (12 * sizeof (char));
     client_info *cur_c;

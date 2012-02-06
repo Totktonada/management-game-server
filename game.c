@@ -178,20 +178,22 @@ void add_sell_prod_request (server_info *sinfo,
 /* Calculate raw count for current market level.
  * This function used sinfo->clients_count for calculation,
  * therefore it returns correct value for current step
- * only before or after clients to go bankrupt. */
+ * only before or after clients to go bankrupt.
+ * Rounding to lower number. */
 unsigned int get_market_raw_count (server_info *sinfo)
 {
-    return (int) ((raw_count_per_player[sinfo->level]
+    return (unsigned int) ((raw_count_per_player[sinfo->level]
         * sinfo->clients_count) / 2);
 }
 
 /* Calculate production need count for current market level.
  * This function used sinfo->clients_count for calculation,
  * therefore it returns correct value for current step
- * only before or after clients to go bankrupt. */
+ * only before or after clients to go bankrupt.
+ * Rounding to lower number. */
 unsigned int get_market_prod_count (server_info *sinfo)
 {
-    return (int) ((prod_count_per_player[sinfo->level]
+    return (unsigned int) ((prod_count_per_player[sinfo->level]
         * sinfo->clients_count) / 2);
 }
 
@@ -243,7 +245,7 @@ void write_number (int write_fd, unsigned int number, int newline)
 {
     char msg_newline[] = "\n";
 
-    /* See comment to number_to_str (). */
+    /* Why 11? See comment to number_to_str (). */
     char *buf = (char *) malloc (11 * sizeof (char));
     int size = number_to_str (buf, number);
     write (write_fd, buf, size);
@@ -337,7 +339,9 @@ Wrong argument: typed command not found.\n\
 
 void do_cmd_nick (client_info *client, char *nick)
 {
-    char msg_your_nickname[] = "Your nickname: ";
+    char msg_your_nickname[] = "\
+Your nickname: ";
+
     char msg_newline[] = "\n";
 
     if (nick == NULL) {
@@ -356,19 +360,27 @@ void do_cmd_nick (client_info *client, char *nick)
 
 void write_common_information (int write_fd, server_info *sinfo)
 {
-    char msg_cl_count[] = "Connected clients count: ";
-    char msg_step[] = "Step: ";
-    char msg_market_level[] = "Market level: ";
-    char msg_market_info_head[] = "----Market info----\n";
-    char msg_numbers_separator_1[] = " / ";
+    /* TODO: fix mishmash with little and large strigns. */
+    char msg_cl_count[] = "\
+Connected clients count: ";
+    char msg_step[] = "\
+Step: ";
+    char msg_market_level[] = "\
+Market level: ";
+    char msg_market_info_head[] = "\
+----Market info----\n";
     char msg_market_raw_count[] = "\
 Raw on market (in all / per player): ";
-    char msg_min_raw_price[] = "Min raw price: ";
+    char msg_min_raw_price[] = "\
+Min raw price: ";
     char msg_market_prod_count[] = "\
 Production need on market (in all / per player): ";
-    char msg_max_prod_price[] = "Max production price: ";
+    char msg_max_prod_price[] = "\
+Max production price: ";
     char msg_level_change_probability[] = "\
 Level change probability (n / 12): ";
+
+    char msg_numbers_separator_1[] = " / ";
     char msg_numbers_separator_2[] = ", ";
     char msg_newline[] = "\n";
     int i;
@@ -424,14 +436,22 @@ Level change probability (n / 12): ";
 /* TODO: nick -> username ? */
 void write_client_information (int write_fd, client_info *client)
 {
+    char msg_client_info_head[] = "\
+----Client info----\n";
+    char msg_nick[] = "\
+Username: ";
+    char msg_money[] = "\
+Money: ";
+    char msg_raw_count[] = "\
+Raws: ";
+    char msg_prod_count[] = "\
+Productions: ";
+    char msg_factory_count[] = "\
+Factories: ";
+    char msg_step_completed[] = "\
+Step completed: ";
+
     char msg_newline[] = "\n";
-    char msg_client_info_head[] = "----Client info----\n";
-    char msg_nick[] = "Username: ";
-    char msg_money[] = "Money: ";
-    char msg_raw_count[] = "Raws: ";
-    char msg_prod_count[] = "Productions: ";
-    char msg_factory_count[] = "Factories: ";
-    char msg_step_completed[] = "Step completed: ";
 
     write (write_fd, msg_client_info_head,
         sizeof (msg_client_info_head) - 1);
@@ -525,9 +545,9 @@ Client with same username not found, try \"status --all\".\n";
 void do_cmd_build (client_info *client, int count)
 {
     char msg_request_stored[] = "\
-Your request stored to processing on end of step.\n";
+Okay! Your request stored to after-step processing.\n";
 
-    /* TODO: check money. */
+    /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
     write (client->fd, msg_request_stored,
@@ -537,11 +557,12 @@ Your request stored to processing on end of step.\n";
 void do_cmd_prod (client_info *client, int count)
 {
     char msg_request_stored[] = "\
-Your request stored to processing on end of step.\n";
+Okay! Your request stored to after-step processing.\n";
     char msg_too_few_factories[] = "\
-You have too few factories. Request rejected.\n";
+You have too few factories. Request rejected.\n\
+See information by \"status\" command.\n";
 
-    /* TODO: check money (nessassary?). */
+    /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
         write (client->fd, msg_too_few_factories,
             sizeof (msg_too_few_factories) - 1);
@@ -558,11 +579,13 @@ void do_cmd_buy (server_info *sinfo, client_info *client,
     int count, int cost)
 {
     char msg_request_stored[] = "\
-Your request stored to processing on end of step.\n";
+Okay! Your request stored to after-step processing.\n";
     char msg_cost_out_of_range[] = "\
-Your cost is out of range. See information by \"status\" command.\n";
+Your cost is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
     char msg_count_out_of_range[] = "\
-Your count is out of range. See information by \"status\" command.\n";
+Your count is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
     request *req;
 
     if (count > get_market_raw_count (sinfo)) {
@@ -588,14 +611,16 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
     int count, int cost)
 {
     char msg_request_stored[] = "\
-Your request stored to processing on end of step.\n";
+Okay! Your request stored to after-step processing.\n";
     char msg_cost_out_of_range[] = "\
-Your cost is out of range. See information by \"status\" command.\n";
+Your cost is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
     char msg_count_out_of_range[] = "\
-Your count is out of range. See information by \"status\" command.\n";
+Your count is out of range. Request rejected.\n\
+See information by \"status\" command.\n";
     char msg_have_not_prod[] = "\
-Your have not so much productions.\
- See information by \"status your_username\" command.\n";
+Your have not so much productions. Request rejected.\n\
+See information by \"status your_username\" command.\n";
 
     request *req;
 
@@ -665,17 +690,22 @@ Server wait for full count of clients. Please wait.\n";
 
 void do_cmd_wrong (int write_fd)
 {
-    const char buf[] = "\
+    const char msg_wrong_cmd[] = "\
 Wrong command. Try \"help\".\n";
+
     /* Write string without '\0'. */
-    write (write_fd, buf, sizeof (buf) - 1);
+    write (write_fd, msg_wrong_cmd, sizeof (msg_wrong_cmd) - 1);
 }
 
 /* Returns:
- * 0, if command not permitted in current server state;
- * 1, otherwise. */
-int permit_command (server_info *sinfo, command *cmd)
+ * 0, if command forbidden in current server state.
+ * Also, write reason of rejection to the client.
+ * 1, otherwise (command allowed). */
+int allow_command (server_info *sinfo, int write_fd, command *cmd)
 {
+    char msg_not_in_game[] = "\
+This command is forbidden before start the game.\n";
+
     switch (cmd->type) {
     case CMD_EMPTY:
     case CMD_HELP:
@@ -693,7 +723,13 @@ int permit_command (server_info *sinfo, command *cmd)
     case CMD_BUY:
     case CMD_SELL:
     case CMD_TURN:
-        return (sinfo->state == G_ST_IN_GAME);
+        if (sinfo->state == G_ST_IN_GAME) {
+            return 1;
+        } else {
+            write (write_fd, msg_not_in_game,
+                sizeof (msg_not_in_game) - 1);
+            return 0;
+        }
 
     case CMD_WRONG:
     case CMD_PROTOCOL_PARSE_ERROR:
@@ -707,13 +743,7 @@ int permit_command (server_info *sinfo, command *cmd)
 void execute_cmd (server_info *sinfo,
     client_info *client, command *cmd)
 {
-    char msg_not_permitted[] = "\
-This command not permitted in current server state.\n";
-
-    if (! permit_command (sinfo, cmd)) {
-        /* TODO: more detailed responses. */
-        write (client->fd, msg_not_permitted,
-            sizeof (msg_not_permitted));
+    if (! allow_command (sinfo, client->fd, cmd)) {
         return;
     }
 
@@ -768,21 +798,10 @@ int game_process_new_client (server_info *sinfo)
     ++(sinfo->clients_count);
     if (sinfo->clients_count == sinfo->expected_clients) {
         sinfo->state = G_ST_IN_GAME;
+        /* TODO: messages for clients. */
     }
 
     return 0;
-}
-
-void grant_request (server_info *sinfo, client_info *client)
-{
-    /* to transform
-    client->build_factory_count = 0;
-    client->make_prod_count = 0;
-    client->buy_raw_count = 0;
-    client->buy_raw_cost = 0;
-    client->sell_prod_count = 0;
-    client->sell_prod_cost = 0;
-    */
 }
 
 void after_step_expenses (client_info *client)
@@ -795,7 +814,8 @@ void after_step_expenses (client_info *client)
 
 void process_client_bankrupt (server_info *sinfo, client_info *client)
 {
-    char msg_bankrupt[] = "You are bankrupt!\n";
+    char msg_bankrupt[] = "\
+You are bankrupt!\n";
 
     /* TODO: maybe, do not disconnect client and permit only
      * "help" and "status" commands. */
@@ -920,6 +940,9 @@ void grant_make_prod_request (client_info *client)
 {
     /* TODO: messages for clients. */
 
+    /* TODO: allow factories to not make productions,
+     * if clients have little money (nessessary?). */
+
     /* Make production. */
     client->raw_count -= client->make_prod_count;
     client->prod_count += client->make_prod_count;
@@ -971,7 +994,6 @@ void game_process_next_step (server_info *sinfo)
     unsigned int market_raw_count = get_market_raw_count (sinfo);
     unsigned int market_prod_count = get_market_prod_count (sinfo);
 
-    /* TODO: check order of auctions and other requests. */
     buy_raw_auction (sinfo, market_raw_count);
     sell_prod_auction (sinfo, market_prod_count);
 
