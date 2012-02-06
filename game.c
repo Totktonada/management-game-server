@@ -971,18 +971,6 @@ void game_process_next_step (server_info *sinfo)
     unsigned int market_raw_count = get_market_raw_count (sinfo);
     unsigned int market_prod_count = get_market_prod_count (sinfo);
 
-    for (cur_client = sinfo->first_client;
-        cur_client != NULL;
-        cur_client = cur_client->next)
-    {
-        cur_client->step_completed = 0;
-
-        after_step_expenses (cur_client);
-        if (cur_client->money < 0) {
-            process_client_bankrupt (sinfo, cur_client);
-        }
-    } /* for */
-
     /* TODO: check order of auctions and other requests. */
     buy_raw_auction (sinfo, market_raw_count);
     sell_prod_auction (sinfo, market_prod_count);
@@ -993,6 +981,7 @@ void game_process_next_step (server_info *sinfo)
     {
         grant_make_prod_request (cur_client);
         grant_build_factories_request (cur_client);
+        after_step_expenses (cur_client);
         if (cur_client->money < 0) {
             process_client_bankrupt (sinfo, cur_client);
         }
