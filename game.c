@@ -152,12 +152,6 @@ void new_game_data (server_info *sinfo)
     sinfo->sell_prod = NULL;
 }
 
-void drop_request (client_info *client)
-{
-    client->build_factory_count = 0;
-    client->make_prod_count = 0;
-}
-
 void new_client_game_data (client_info *client)
 {
     /* Nick would be changed in process_new_client () in "main.c". */
@@ -168,7 +162,8 @@ void new_client_game_data (client_info *client)
     client->factory_count = START_FACTORY_COUNT;
     client->step_completed = 0; /* Step not completed */
 
-    drop_request (client);
+    client->build_factory_count = 0;
+    client->make_prod_count = 0;
 }
 
 request *new_request (client_info *client,
@@ -950,6 +945,7 @@ void grant_make_prod_request (client_info *client)
     client->raw_count -= client->make_prod_count;
     client->prod_count += client->make_prod_count;
     client->money -= client->make_prod_count * MAKE_PROD_COST;
+    client->make_prod_count = 0;
 }
 
 void grant_build_factories_request (client_info *client)
@@ -967,6 +963,7 @@ void grant_build_factories_request (client_info *client)
     client->building_factory_3 = client->building_factory_2;
     client->building_factory_2 = client->building_factory_1;
     client->building_factory_1 = client->build_factory_count;
+    client->build_factory_count = 0;
 
     client->money -=
         client->building_factory_1 * MAKE_FACTORY_FIRST_HALF;
