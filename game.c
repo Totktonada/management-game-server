@@ -24,7 +24,7 @@ const unsigned int level_change_probability[5][5] = {
     { 1, 1, 2, 4, 4 }
 };
 
-/*   Messages  */
+/*  Messages   */
 /* =========== */
 
 /* Command help */
@@ -52,74 +52,74 @@ Wrong argument: typed command not found.\n\
 ";
 
 /* Command nick */
-char msg_your_nickname[] = "\
+const char msg_your_nickname[] = "\
 Your nickname: ";
 
 /* Common information */
 /* TODO: fix mishmash with little and large strigns. */
-char msg_cl_count[] = "\
+const char msg_cl_count[] = "\
 Connected clients count: ";
-char msg_step[] = "\
+const char msg_step[] = "\
 Step: ";
-char msg_market_level[] = "\
+const char msg_market_level[] = "\
 Market level: ";
-char msg_market_info_head[] = "\
+const char msg_market_info_head[] = "\
 ----Market info----\n";
-char msg_market_raw_count[] = "\
+const char msg_market_raw_count[] = "\
 Raw on market (in all / per player): ";
-char msg_min_raw_price[] = "\
+const char msg_min_raw_price[] = "\
 Min raw price: ";
-char msg_market_prod_count[] = "\
+const char msg_market_prod_count[] = "\
 Production need on market (in all / per player): ";
-char msg_max_prod_price[] = "\
+const char msg_max_prod_price[] = "\
 Max production price: ";
-char msg_level_change_probability[] = "\
+const char msg_level_change_probability[] = "\
 Level change probability (n / 12): ";
 
 /* Client information */
-char msg_client_info_head[] = "\
+const char msg_client_info_head[] = "\
 ----Client info----\n";
-char msg_nick[] = "\
+const char msg_nick[] = "\
 Username: ";
-char msg_money[] = "\
+const char msg_money[] = "\
 Money: ";
-char msg_raw_count[] = "\
+const char msg_raw_count[] = "\
 Raws: ";
-char msg_prod_count[] = "\
+const char msg_prod_count[] = "\
 Productions: ";
-char msg_factory_count[] = "\
+const char msg_factory_count[] = "\
 Factories: ";
-char msg_is_step_completed[] = "\
+const char msg_is_step_completed[] = "\
 Step completed: ";
 
 /* Command status */
-char msg_client_not_found[] = "\
+const char msg_client_not_found[] = "\
 Client with same username not found, try \"status --all\".\n";
 
 /* For requests. */
-char msg_request_stored[] = "\
+const char msg_request_stored[] = "\
 Okay! Your request stored to after-step processing.\n";
 
 /* For requests. Command prod. */
-char msg_too_few_factories[] = "\
+const char msg_too_few_factories[] = "\
 You have too few factories. Request rejected.\n\
 See information by \"status\" command.\n";
 
 /* For requests. Commands buy and sell. */
-char msg_cost_out_of_range[] = "\
+const char msg_cost_out_of_range[] = "\
 Your cost is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
-char msg_count_out_of_range[] = "\
+const char msg_count_out_of_range[] = "\
 Your count is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
-char msg_have_not_prod[] = "\
+const char msg_have_not_prod[] = "\
 Your have not so much productions. Request rejected.\n\
 See information by \"status your_username\" command.\n";
 
 /* Command turn */
-char msg_step_completed[] = "\
+const char msg_step_completed[] = "\
 Step already completed, wait for other clients.\n";
-char msg_wait_clients[] = "\
+const char msg_wait_clients[] = "\
 Server wait for full count of clients. Please wait.\n";
 
 /* Wrong command */
@@ -127,18 +127,18 @@ const char msg_wrong_cmd[] = "\
 Wrong command. Try \"help\".\n";
 
 /* Command allowing */
-char msg_not_in_game[] = "\
+const char msg_not_in_game[] = "\
 This command is forbidden before start the game.\n";
 
 /* Process client bankrupt */
-char msg_bankrupt[] = "\
+const char msg_bankrupt[] = "\
 You are bankrupt!\n";
 
 /* Auxiliary messages */
-char msg_newline[] = "\n";
-char msg_dot_five[] = ".5";
-char msg_numbers_separator_1[] = " / ";
-char msg_numbers_separator_2[] = ", ";
+const char msg_newline[] = "\n";
+const char msg_dot_five[] = ".5";
+const char msg_numbers_separator_1[] = " / ";
+const char msg_numbers_separator_2[] = ", ";
 
 /* =========== */
 
