@@ -1,5 +1,14 @@
 Socket server for management game.
 
-For more information see http://www.stolyarov.info/books/pdf/gameserv.pdf (in russian).
+==== What is it? ====
+This is implementation of university task. For full game rules
+(not implemented in this) see [1]. For task and reduced rules see [2].
 
+==== Notes ====
 Used buffer.[ch] from https://github.com/Totktonada/shell .
+
+==== Books ====
+[1] Chales Wetherell "Etudes for programmers"
+    (the book has english and russian releases).
+[2] http://www.stolyarov.info/books/gameserv
+    (only in russian).
