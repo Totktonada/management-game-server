@@ -28,7 +28,9 @@ const unsigned int level_change_probability[5][5] = {
 /* =========== */
 
 /* Command help */
-const char msg_help_without_cmd[] = "\
+/* String splitted to two part, because gcc
+ * makes warning on strings longer 509 symbols. */
+const char msg_help_common_part1[] = "\
 Available commands:\n\
 * help [command]\n\
 * nick [string]\n\
@@ -38,24 +40,107 @@ Available commands:\n\
 * buy count cost\n\
 * sell count cost\n\
 * turn\n\
-Command parser is case insensitive and have fun,\
- when you type commands in uppercase.\n\
-";
-const char msg_cmd_help[] = "\
+\n\
+Command parser is case insensitive and have fun,\n\
+when you type commands in uppercase.\n\n";
+const char msg_help_common_part2[] = "\
+Rules you can see in book [1] or [2]. Also, very\n\
+short and not full instructions you can find in\n\
+\"on command\" help.\n\
+\n\
+Books:\n\
+[1] Chales Wetherell \"Etudes for programmers\"\n\
+    (the book has english and russian releases).\n\
+[2] http://www.stolyarov.info/books/gameserv\n\
+    (only in russian).\n";
+const char msg_help_cmd_help[] = "\
 help [command]\n\
-If have not argument, print available commands.\
- If argument is command name, print short help\
- about this command.\n\
-";
-const char msg_unknown_cmd[] = "\
-Wrong argument: typed command not found.\n\
-";
+\n\
+If have not argument, print available commands.\n\
+If argument is command name, print short help\n\
+about this command.\n";
+const char msg_help_cmd_nick[] = "\
+nick [string]\n\
+\n\
+If have not argument, simply print your username.\n\
+Otherwise, change your username to \"string\".\n\
+Usernames starts with '-' are forbidden.\n";
+const char msg_help_cmd_status[] = "\
+status [username | --all | -a]\n\
+\n\
+Command have three forms:\n\
+1. status\n\
+   Without arguments command print common information\n\
+   and information about your current state.\n\
+2. status username\n\
+   Print common information and information about\n\
+   pointed client.\n\
+3. status [--all | -a]\n\
+   Print common information and information about all\n\
+   connected clients.\n";
+const char msg_help_cmd_build[] = "\
+build count\n\
+\n\
+Start process of building count factories.\n\
+One factory cost:\n\
+* 2500 after current step\n\
+* and 2500 after (current + 5) step.\n\
+After second payment, count factories is ready to work.\n";
+/* TODO: use MAKE_FACTORY_FIRST_HALF
+ * and MAKE_FACTORY_SECOND_HALF macro. */
+const char msg_help_cmd_prod[] = "\
+prod count\n\
+\n\
+Make production on your factories.\n\
+One factory can make one production in one step.\n\
+One production cost: 2000.\n";
+/* TODO: use MAKE_PROD_COST macro. */
+const char msg_help_cmd_buy[] = "\
+buy count cost\n\
+\n\
+Add request to buy raw auction. Satisfied limited count\n\
+of requests (1-3 per client depending on market level).\n\
+In the first place satisfy requests with *maximum* cost.\n\
+Minimum cost of requested raw limited by some value\n\
+(300-800), which depended on market level.\n\
+\n\
+For information about current market level, see \"status\"\n\
+command.\n";
+const char msg_help_cmd_sell[] = "\
+sell count cost\n\
+\n\
+Add offer to sell production auction. Satisfied limited\n\
+count of offers (1-3 per client depending on market level).\n\
+In the first place satisfy offers with *minimum* cost.\n\
+Maximum cost of offered production limited by some value\n\
+(4500-6500), which depended on market level.\n\
+\n\
+For information about current market level, see \"status\"\n\
+command.\n";
+const char msg_help_cmd_turn[] = "\
+turn\n\
+\n\
+To finish step. After this your requests (and offers) really\n\
+satisfied (or, on auctions, possibly not satisfied), from\n\
+your money substracted some expenses.\n\
+\n\
+Expenses:\n\
+* 350 for one raw;\n\
+* 500 for one production;\n\
+* 1000 for one factory;\n\
+Raws, productions and factories counts used in expenses\n\
+calculation after processing all requests and offers.\n";
+const char msg_help_cmd_wrong[] = "\
+Unknown command. See \"help\" (without argumenst)\n\
+for available commands list.\n";
 
 /* Command nick */
 const char msg_your_nick[] = "\
 Your username: ";
-const char msg_forbid_nick[] = "\
+const char msg_nick_forbid[] = "\
 Usernames starts with '-' are forbidden. Request rejected.\n";
+const char msg_nick_employed[] = "\
+Client with same nick already exists. Request rejected.\n";
 
 /* Common information */
 /* TODO: fix mishmash with little and large strigns. */
@@ -125,8 +210,9 @@ const char msg_wait_clients[] = "\
 Server wait for full count of clients. Please wait.\n";
 
 /* Wrong command */
-const char msg_wrong_cmd[] = "\
-Wrong command. Try \"help\".\n";
+const char msg_cmd_wrong[] = "\
+Wrong command or argument(s). See \"help\"\n\
+for information about available commands.\n";
 
 /* Command allowing */
 const char msg_not_in_game[] = "\
@@ -389,50 +475,95 @@ void write_number_half (int write_fd, unsigned int number, int newline)
 void do_cmd_help (int write_fd, char *cmd_name)
 {
     if (cmd_name == NULL) {
-        write (write_fd, msg_help_without_cmd,
-            sizeof (msg_help_without_cmd) - 1);
+        write (write_fd, msg_help_common_part1,
+            sizeof (msg_help_common_part1) - 1);
+        write (write_fd, msg_help_common_part2,
+            sizeof (msg_help_common_part2) - 1);
         return;
     }
 
-    /* TODO */
     switch (get_cmd_type (cmd_name)) {
     case CMD_HELP:
-        write (write_fd, msg_cmd_help,
-            sizeof (msg_cmd_help) - 1);
+        write (write_fd, msg_help_cmd_help,
+            sizeof (msg_help_cmd_help) - 1);
         break;
     case CMD_NICK:
+        write (write_fd, msg_help_cmd_nick,
+            sizeof (msg_help_cmd_nick) - 1);
         break;
     case CMD_STATUS:
+        write (write_fd, msg_help_cmd_status,
+            sizeof (msg_help_cmd_status) - 1);
         break;
     case CMD_BUILD:
+        write (write_fd, msg_help_cmd_build,
+            sizeof (msg_help_cmd_build) - 1);
         break;
     case CMD_PROD:
         /* TODO: information about cost of one production. */
+        write (write_fd, msg_help_cmd_prod,
+            sizeof (msg_help_cmd_prod) - 1);
         break;
     case CMD_BUY:
+        write (write_fd, msg_help_cmd_buy,
+            sizeof (msg_help_cmd_buy) - 1);
         break;
     case CMD_SELL:
+        write (write_fd, msg_help_cmd_sell,
+            sizeof (msg_help_cmd_sell) - 1);
         break;
     case CMD_TURN:
+        write (write_fd, msg_help_cmd_turn,
+            sizeof (msg_help_cmd_turn) - 1);
         break;
     case CMD_WRONG:
-        write (write_fd, msg_unknown_cmd,
-            sizeof (msg_unknown_cmd) - 1);
+        /* Unknown command. */
+        write (write_fd, msg_help_cmd_wrong,
+            sizeof (msg_help_cmd_wrong) - 1);
         break;
     case CMD_EMPTY:
     case CMD_PROTOCOL_PARSE_ERROR:
-        /* Not possible */
+        /* Not possible. */
         break;
     }
 }
 
-void do_cmd_nick (client_info *client, char *nick)
+/* Returns:
+ * client with nick equal to nick argument;
+ * NULL, if same client not found. */
+client_info *get_client_by_nick (client_info *first_client,
+    const char *nick)
+{
+    client_info *cur_client;
+
+    for (cur_client = first_client;
+        cur_client != NULL;
+        cur_client = cur_client->next)
+    {
+        if (STR_EQUAL (nick, cur_client->nick)) {
+            return cur_client;
+        }
+    }
+
+    return NULL;
+}
+
+void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
 {
     if (nick != NULL) {
+        /* If starts with '-'. */
         if (*nick == '-') {
             free (nick);
-            write (client->fd, msg_forbid_nick,
-                sizeof (msg_forbid_nick) - 1);
+            write (client->fd, msg_nick_forbid,
+                sizeof (msg_nick_forbid) - 1);
+            return;
+        }
+
+        /* If already exists. */
+        if (get_client_by_nick (sinfo->first_client, nick) != NULL) {
+            free (nick);
+            write (client->fd, msg_nick_employed,
+                sizeof (msg_nick_employed) - 1);
             return;
         }
 
@@ -526,26 +657,6 @@ void write_client_information (int write_fd, client_info *client)
     /* TODO: write "true" or "false". */
 
     /* TODO: write information about requests */
-}
-
-/* Returns:
- * client with nick equal to nick argument;
- * NULL, if same client not found. */
-client_info *get_client_by_nick (client_info *first_client,
-    char *nick)
-{
-    client_info *cur_client;
-
-    for (cur_client = first_client;
-        cur_client != NULL;
-        cur_client = cur_client->next)
-    {
-        if (STR_EQUAL (nick, cur_client->nick)) {
-            return cur_client;
-        }
-    }
-
-    return NULL;
 }
 
 void do_cmd_status (server_info *sinfo, client_info *client,
@@ -703,7 +814,7 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
 void do_cmd_wrong (int write_fd)
 {
     /* Write string without '\0'. */
-    write (write_fd, msg_wrong_cmd, sizeof (msg_wrong_cmd) - 1);
+    write (write_fd, msg_cmd_wrong, sizeof (msg_cmd_wrong) - 1);
 }
 
 /* Returns:
@@ -764,7 +875,7 @@ int execute_cmd (server_info *sinfo,
         do_cmd_help (client->fd, cmd->value.str);
         break;
     case CMD_NICK:
-        do_cmd_nick (client, cmd->value.str);
+        do_cmd_nick (sinfo, client, cmd->value.str);
         break;
     case CMD_STATUS:
         do_cmd_status (sinfo, client, cmd->value.str);

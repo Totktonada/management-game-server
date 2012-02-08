@@ -3,7 +3,8 @@
 /* Static data */
 /* =========== */
 
-const char msg_prompt[] = " $ ";
+const char msg_prompt_part1[] = "\n";
+const char msg_prompt_part2[] = " $ ";
 
 /* =========== */
 
@@ -41,8 +42,12 @@ char *first_vacant_nick (client_info *first_client)
 
 void print_prompt (client_info *client)
 {
-    write (client->fd, client->nick, strlen (client->nick));
-    write (client->fd, msg_prompt, sizeof (msg_prompt) - 1);
+    write (client->fd, msg_prompt_part1,
+        sizeof (msg_prompt_part1) - 1);
+    write (client->fd, client->nick,
+        strlen (client->nick));
+    write (client->fd, msg_prompt_part2,
+        sizeof (msg_prompt_part2) - 1);
 }
 
 /* On success set sinfo->listening_socket

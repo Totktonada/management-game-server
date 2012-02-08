@@ -19,9 +19,9 @@
 #define PROD_EXPENSES 500
 #define FACTORY_EXPENSES 1000
 
-#define MAKE_PROD_COST 2000
 #define MAKE_FACTORY_FIRST_HALF 2500
 #define MAKE_FACTORY_SECOND_HALF 2500
+#define MAKE_PROD_COST 2000
 
 void new_game_data (server_info *sinfo);
 void new_client_game_data (client_info *client);
