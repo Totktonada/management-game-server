@@ -58,6 +58,6 @@ void new_parser_info (parser_info *pinfo);
 void put_new_data_to_parser (parser_info *pinfo,
     char *read_buffer, int read_available);
 command *get_cmd (parser_info *pinfo);
-void destroy_cmd (command *cmd);
+void destroy_cmd (command *cmd, int destroy_str);
 
 #endif

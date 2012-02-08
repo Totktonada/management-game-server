@@ -1,5 +1,12 @@
 #include "main.h"
 
+/* Static data */
+/* =========== */
+
+const char msg_prompt[] = " $ ";
+
+/* =========== */
+
 char *first_vacant_nick (client_info *first_client)
 {
     /* Why 12? See comment to number_to_str ().
@@ -30,6 +37,12 @@ char *first_vacant_nick (client_info *first_client)
     } while (nick_found);
 
     return buf;
+}
+
+void print_prompt (client_info *client)
+{
+    write (client->fd, client->nick, strlen (client->nick));
+    write (client->fd, msg_prompt, sizeof (msg_prompt) - 1);
 }
 
 /* On success set sinfo->listening_socket
@@ -206,11 +219,14 @@ void process_new_client (server_info *sinfo, int listening_socket)
     if (sinfo->max_fd < client_socket) {
         sinfo->max_fd = client_socket;
     }
+
+    print_prompt (new_client);
 }
 
 void process_readed_data (server_info *sinfo, client_info *client)
 {
     command *cmd;
+    int destroy_str;
 
     put_new_data_to_parser (&(client->pinfo),
         client->read_buffer,
@@ -230,8 +246,9 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #ifndef DAEMON
         print_cmd (cmd);
 #endif
-        execute_cmd (sinfo, client, cmd);
-        destroy_cmd (cmd);
+        destroy_str = execute_cmd (sinfo, client, cmd);
+        destroy_cmd (cmd, destroy_str);
+        print_prompt (client);
     } while (1);
 }
 

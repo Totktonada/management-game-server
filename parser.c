@@ -352,8 +352,13 @@ command *get_cmd (parser_info *pinfo)
     return cmd;
 }
 
-void destroy_cmd (command *cmd)
+void destroy_cmd (command *cmd, int destroy_str)
 {
+    if (!destroy_str) {
+        free (cmd);
+        return;
+    }
+
     switch (cmd->type) {
     case CMD_HELP:
     case CMD_NICK:

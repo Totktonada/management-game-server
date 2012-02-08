@@ -52,8 +52,10 @@ Wrong argument: typed command not found.\n\
 ";
 
 /* Command nick */
-const char msg_your_nickname[] = "\
-Your nickname: ";
+const char msg_your_nick[] = "\
+Your username: ";
+const char msg_forbid_nick[] = "\
+Usernames starts with '-' are forbidden. Request rejected.\n";
 
 /* Common information */
 /* TODO: fix mishmash with little and large strigns. */
@@ -426,18 +428,21 @@ void do_cmd_help (int write_fd, char *cmd_name)
 
 void do_cmd_nick (client_info *client, char *nick)
 {
-    if (nick == NULL) {
-        write (client->fd, msg_your_nickname,
-            sizeof (msg_your_nickname) - 1);
-        write (client->fd, client->nick,
-            strlen (client->nick));
-        write (client->fd, msg_newline,
-            sizeof (msg_newline) - 1);
-        return;
+    if (nick != NULL) {
+        if (*nick == '-') {
+            free (nick);
+            write (client->fd, msg_forbid_nick,
+                sizeof (msg_forbid_nick) - 1);
+            return;
+        }
+
+        free (client->nick);
+        client->nick = nick;
     }
 
-    /* TODO: change nick. */
-    /* TODO: forbid nick, starts with '-'. */
+    write (client->fd, msg_your_nick, sizeof (msg_your_nick) - 1);
+    write (client->fd, client->nick, strlen (client->nick));
+    write (client->fd, msg_newline, sizeof (msg_newline) - 1);
 }
 
 void write_common_information (int write_fd, server_info *sinfo)
@@ -741,11 +746,14 @@ int allow_command (server_info *sinfo, int write_fd, command *cmd)
     return 1;
 }
 
-void execute_cmd (server_info *sinfo,
+/* Returns:
+ * 1, if pointer cmd->value.str not used.
+ * 0, otherwise. */
+int execute_cmd (server_info *sinfo,
     client_info *client, command *cmd)
 {
     if (! allow_command (sinfo, client->fd, cmd)) {
-        return;
+        return 1;
     }
 
     switch (cmd->type) {
@@ -785,6 +793,8 @@ void execute_cmd (server_info *sinfo,
         /* Not possible */
         break;
     }
+
+    return (cmd->type != CMD_NICK);
 }
 
 /* Returns:

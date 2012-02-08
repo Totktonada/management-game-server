@@ -30,7 +30,7 @@ void new_client_game_data (client_info *client);
 void print_cmd (command *cmd);
 #endif
 
-void execute_cmd (server_info *sinfo,
+int execute_cmd (server_info *sinfo,
     client_info *client, command *cmd);
 
 int game_process_new_client (server_info *sinfo);
