@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #define DEFAULT_LISTENING_PORT 37187
 #define READ_BUFFER_SIZE 1024
@@ -114,12 +115,24 @@ typedef struct server_info {
     request_group *sell_prod;
 } server_info;
 
+typedef enum disconnect_reasons {
+    MSG_DISC_BY_CLIENT,
+    MSG_DISC_PROTOCOL_PARSE_ERROR,
+    MSG_DISC_BANKRUPTING
+} disconnect_reasons;
+
 void unregister_client (server_info *sinfo,
     client_info *client);
 
 void client_disconnect (server_info *sinfo,
     client_info *client,
-    int client_in_server_info_list);
+    int client_in_server_info_list,
+    int currently_connected);
+
+void msg_client_disconnected_to_all (
+    const server_info *sinfo,
+    const client_info *client,
+    disconnect_reasons reason);
 
 #include "parameters.h"
 #include "game.h"

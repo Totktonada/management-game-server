@@ -938,11 +938,12 @@ void process_client_bankrupt (server_info *sinfo, client_info *client)
 {
     /* TODO: maybe, do not disconnect client and permit only
      * "help" and "status" commands. */
-    /* TODO: messages about this event for all clients. */
+    msg_client_disconnected_to_all (sinfo, client,
+        MSG_DISC_BANKRUPTING);
     write (client->fd, msg_bankrupt,
         sizeof (msg_bankrupt) - 1);
     unregister_client (sinfo, client);
-    client_disconnect (sinfo, client, 1);
+    client_disconnect (sinfo, client, 1, 1);
     free (client);
 }
 

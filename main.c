@@ -6,6 +6,26 @@
 const char msg_prompt_part1[] = "\n";
 const char msg_prompt_part2[] = " $ ";
 
+const char msg_disconnecting[] = "\
+Disconnecting...\n";
+
+const char msg_protocol_parse_error[] = "\
+Protocol parse error.\n";
+
+const char msg_client[] = "\
+Client ";
+const char msg_disconnected[] = "\
+ disconnected.\nReason: ";
+
+const char msg_disc_by_client[] = "\
+connection closed by client.\n";
+
+const char msg_disc_protocol_parse_error[] = "\
+protocol parse error.\n";
+
+const char msg_disc_bankrupting[] = "\
+bankrupting.\n";
+
 /* =========== */
 
 char *first_vacant_nick (client_info *first_client)
@@ -48,6 +68,42 @@ void print_prompt (client_info *client)
         strlen (client->nick));
     write (client->fd, msg_prompt_part2,
         sizeof (msg_prompt_part2) - 1);
+}
+
+void msg_client_disconnected_to_all (const server_info *sinfo,
+    const client_info *client, disconnect_reasons reason)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c == client)
+            continue;
+
+        write (cur_c->fd, msg_client,
+            sizeof (msg_client) - 1);
+        write (cur_c->fd, client->nick,
+            strlen (client->nick));
+        write (cur_c->fd, msg_disconnected,
+            sizeof (msg_disconnected) - 1);
+
+        switch (reason) {
+        case MSG_DISC_BY_CLIENT:
+            write (cur_c->fd, msg_disc_by_client,
+                sizeof (msg_disc_by_client) - 1);
+            break;
+        case MSG_DISC_PROTOCOL_PARSE_ERROR:
+            write (cur_c->fd, msg_disc_protocol_parse_error,
+                sizeof (msg_disc_protocol_parse_error) - 1);
+            break;
+        case MSG_DISC_BANKRUPTING:
+            write (cur_c->fd, msg_disc_bankrupting,
+                sizeof (msg_disc_bankrupting) - 1);
+            break;
+        }
+    }
 }
 
 /* On success set sinfo->listening_socket
@@ -165,9 +221,12 @@ void unregister_client (server_info *sinfo, client_info *client)
 
 /* Disconnect client. */
 void client_disconnect (server_info *sinfo, client_info *client,
-    int client_in_server_info_list)
+    int client_in_server_info_list, int currently_connected)
 {
-    /* TODO: write "Disconnecting..." */
+    if (currently_connected) {
+        write (client->fd, msg_disconnecting,
+            sizeof (msg_disconnecting) - 1);
+    }
 
     if (client_in_server_info_list) {
         FD_CLR (client->fd, &(sinfo->read_fds));
@@ -207,7 +266,7 @@ void process_new_client (server_info *sinfo, int listening_socket)
     if (game_process_new_client (sinfo)) {
         write (client_socket, msg_disconnect,
             sizeof (msg_disconnect) - 1);
-        client_disconnect (sinfo, new_client, 0);
+        client_disconnect (sinfo, new_client, 0, 1);
         free (new_client);
         return;
     }
@@ -242,9 +301,12 @@ void process_readed_data (server_info *sinfo, client_info *client)
         if (cmd == NULL)
             break;
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
-            /* TODO: tell client about disconnect reason. */
+            msg_client_disconnected_to_all (sinfo, client,
+                MSG_DISC_PROTOCOL_PARSE_ERROR);
+            write (client->fd, msg_protocol_parse_error,
+                sizeof (msg_protocol_parse_error) - 1);
             unregister_client (sinfo, client);
-            client_disconnect (sinfo, client, 1);
+            client_disconnect (sinfo, client, 1, 1);
             free (client);
             break;
         }
@@ -277,9 +339,10 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
             perror ("read ()");
             exit (ES_SYSCALL_FAILED);
         } else if (READ_EOF (read_value)) {
-            /* TODO: messages about this event for all clients. */
+            msg_client_disconnected_to_all (sinfo, cur_c,
+                MSG_DISC_BY_CLIENT);
             unregister_client (sinfo, cur_c);
-            client_disconnect (sinfo, cur_c, 1);
+            client_disconnect (sinfo, cur_c, 1, 0);
             free (cur_c);
         } else {
             cur_c->read_available = read_value;
