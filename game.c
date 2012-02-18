@@ -143,25 +143,28 @@ const char msg_nick_employed[] = "\
 Client with same nick already exists. Request rejected.\n";
 
 /* Common information */
-/* TODO: fix mishmash with little and large strigns. */
 const char msg_cl_count[] = "\
-Connected clients count: ";
+Connected: ";
 const char msg_step[] = "\
 Step: ";
 const char msg_market_level[] = "\
 Market level: ";
 const char msg_market_info_head[] = "\
 ----Market info----\n";
+const char msg_in_all_per_player[] = "\
+        (in all / per player)\n";
 const char msg_market_raw_count[] = "\
-Raw on market (in all / per player): ";
+Raws on market: ";
 const char msg_min_raw_price[] = "\
 Min raw price: ";
 const char msg_market_prod_count[] = "\
-Production need on market (in all / per player): ";
+Productions: ";
 const char msg_max_prod_price[] = "\
-Max production price: ";
-const char msg_level_change_probability[] = "\
-Level change probability (n / 12): ";
+Max prod. price: ";
+const char msg_next_level[] = "\
+Next level: ";
+const char msg_probability_twelve[] = "\
+        (probability * 12)\n";
 
 /* Client information */
 const char msg_client_info_head[] = "\
@@ -587,7 +590,8 @@ void write_common_information (int write_fd, server_info *sinfo)
     write_number (write_fd, sinfo->step, 1);
 
     write (write_fd, msg_market_level, sizeof (msg_market_level) - 1);
-    write_number (write_fd, sinfo->level + 1, 1); /* This is index! */
+    /* sinfo->level is index. */
+    write_number (write_fd, sinfo->level + 1, 1);
 
     write (write_fd, msg_market_info_head,
         sizeof (msg_market_info_head) - 1);
@@ -598,7 +602,9 @@ void write_common_information (int write_fd, server_info *sinfo)
     write (write_fd, msg_numbers_separator_1,
         sizeof (msg_numbers_separator_1) - 1);
     write_number_half (write_fd,
-        raw_count_per_player[sinfo->level], 1);
+        raw_count_per_player[sinfo->level], 0);
+    write (write_fd, msg_in_all_per_player,
+        sizeof (msg_in_all_per_player) - 1);
 
     write (write_fd, msg_min_raw_price, sizeof (msg_min_raw_price) - 1);
     write_number (write_fd, min_raw_price[sinfo->level], 1);
@@ -609,23 +615,25 @@ void write_common_information (int write_fd, server_info *sinfo)
     write (write_fd, msg_numbers_separator_1,
         sizeof (msg_numbers_separator_1) - 1);
     write_number_half (write_fd,
-        prod_count_per_player[sinfo->level], 1);
+        prod_count_per_player[sinfo->level], 0);
+    write (write_fd, msg_in_all_per_player,
+        sizeof (msg_in_all_per_player) - 1);
 
     write (write_fd, msg_max_prod_price, sizeof (msg_max_prod_price) - 1);
     write_number (write_fd, max_prod_price[sinfo->level], 1);
 
-    write (write_fd, msg_level_change_probability,
-        sizeof (msg_level_change_probability) - 1);
+    write (write_fd, msg_next_level,
+        sizeof (msg_next_level) - 1);
     for (i = 0; i < 5; ++i) {
         write_number (write_fd,
             level_change_probability[sinfo->level][i], 0);
         if (i < 4) {
             write (write_fd, msg_numbers_separator_2,
                 sizeof (msg_numbers_separator_2) - 1);
-        } else {
-            write (write_fd, msg_newline, sizeof (msg_newline) - 1);
         }
     }
+    write (write_fd, msg_probability_twelve,
+        sizeof (msg_probability_twelve) - 1);
 }
 
 /* TODO: nick -> username ? */
