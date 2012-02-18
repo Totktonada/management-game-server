@@ -144,43 +144,59 @@ Client with same nick already exists. Request rejected.\n";
 
 /* Common information */
 const char msg_cl_count[] = "\
-Connected: ";
+Connected:     ";
 const char msg_step[] = "\
-Step: ";
+Current month: ";
 const char msg_market_level[] = "\
-Market level: ";
+Market level:  ";
 const char msg_market_info_head[] = "\
-----Market info----\n";
+\n====Market info====\n";
 const char msg_in_all_per_player[] = "\
-        (in all / per player)\n";
+      (in all / per player)\n";
 const char msg_market_raw_count[] = "\
-Raws on market: ";
+Raws on market:  ";
 const char msg_min_raw_price[] = "\
-Min raw price: ";
+Min raw price:   ";
 const char msg_market_prod_count[] = "\
-Productions: ";
+Productions:     ";
 const char msg_max_prod_price[] = "\
 Max prod. price: ";
 const char msg_next_level[] = "\
-Next level: ";
+Next level:      ";
 const char msg_probability_twelve[] = "\
-        (probability * 12)\n";
+      (probability * 12)\n";
 
 /* Client information */
 const char msg_client_info_head[] = "\
-----Client info----\n";
+\n====Client info====\n";
 const char msg_nick[] = "\
-Username: ";
+Username:        ";
 const char msg_money[] = "\
-Money: ";
+Money:           ";
 const char msg_raw_count[] = "\
-Raws: ";
+Raws:            ";
 const char msg_prod_count[] = "\
-Productions: ";
+Productions:     ";
 const char msg_factory_count[] = "\
-Factories: ";
+Factories:       ";
 const char msg_is_step_completed[] = "\
-Step completed: ";
+Month completed: ";
+
+/* Requests */
+const char msg_requests_head[] = "\
+\n---Requests info---\n";
+const char msg_build_factory_count[] = "\
+Build factories:       ";
+const char msg_make_prod_count[] = "\
+Make productions:      ";
+const char msg_building_factories_1[] = "\
+1 month old factories: ";
+const char msg_building_factories_2[] = "\
+2 month old factories: ";
+const char msg_building_factories_3[] = "\
+3 month old factories: ";
+const char msg_building_factories_4[] = "\
+4 month old factories: ";
 
 /* Command status */
 const char msg_client_not_found[] = "\
@@ -637,34 +653,66 @@ void write_common_information (int write_fd, server_info *sinfo)
 }
 
 /* TODO: nick -> username ? */
-void write_client_information (int write_fd, client_info *client)
+void write_client_information (client_info *to_client,
+    client_info *about_client)
 {
-    write (write_fd, msg_client_info_head,
+    write (to_client->fd, msg_client_info_head,
         sizeof (msg_client_info_head) - 1);
 
-    write (write_fd, msg_nick, sizeof (msg_nick) - 1);
-    write (write_fd, client->nick, strlen (client->nick));
-    write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+    write (to_client->fd, msg_nick, sizeof (msg_nick) - 1);
+    write (to_client->fd, about_client->nick,
+        strlen (about_client->nick));
+    write (to_client->fd, msg_newline, sizeof (msg_newline) - 1);
 
-    write (write_fd, msg_money, sizeof (msg_money) - 1);
-    write_number (write_fd, client->money, 1);
+    write (to_client->fd, msg_money, sizeof (msg_money) - 1);
+    write_number (to_client->fd, about_client->money, 1);
 
-    write (write_fd, msg_raw_count, sizeof (msg_raw_count) - 1);
-    write_number (write_fd, client->raw_count, 1);
+    write (to_client->fd, msg_raw_count, sizeof (msg_raw_count) - 1);
+    write_number (to_client->fd, about_client->raw_count, 1);
 
-    write (write_fd, msg_prod_count, sizeof (msg_prod_count) - 1);
-    write_number (write_fd, client->prod_count, 1);
+    write (to_client->fd, msg_prod_count, sizeof (msg_prod_count) - 1);
+    write_number (to_client->fd, about_client->prod_count, 1);
 
-    write (write_fd, msg_factory_count,
+    write (to_client->fd, msg_factory_count,
         sizeof (msg_factory_count) - 1);
-    write_number (write_fd, client->factory_count, 1);
+    write_number (to_client->fd, about_client->factory_count, 1);
 
-    write (write_fd, msg_is_step_completed,
+    write (to_client->fd, msg_is_step_completed,
         sizeof (msg_is_step_completed) - 1);
-    write_number (write_fd, client->step_completed, 1);
+    write_number (to_client->fd, about_client->step_completed, 1);
     /* TODO: write "true" or "false". */
 
-    /* TODO: write information about requests */
+    if (to_client != about_client)
+        return;
+
+    write (to_client->fd, msg_requests_head,
+        sizeof (msg_requests_head) - 1);
+
+    write (to_client->fd, msg_build_factory_count,
+        sizeof (msg_build_factory_count) - 1);
+    write_number (to_client->fd, about_client->build_factory_count, 1);
+
+    write (to_client->fd, msg_make_prod_count,
+        sizeof (msg_make_prod_count) - 1);
+    write_number (to_client->fd, about_client->make_prod_count, 1);
+
+    write (to_client->fd, msg_building_factories_1,
+        sizeof (msg_building_factories_1) - 1);
+    write_number (to_client->fd, about_client->building_factory_1, 1);
+
+    write (to_client->fd, msg_building_factories_2,
+        sizeof (msg_building_factories_2) - 1);
+    write_number (to_client->fd, about_client->building_factory_2, 1);
+
+    write (to_client->fd, msg_building_factories_3,
+        sizeof (msg_building_factories_3) - 1);
+    write_number (to_client->fd, about_client->building_factory_3, 1);
+
+    write (to_client->fd, msg_building_factories_4,
+        sizeof (msg_building_factories_4) - 1);
+    write_number (to_client->fd, about_client->building_factory_4, 1);
+
+    /* TODO: write information about buy_raw and sell_prod requests */
 }
 
 void do_cmd_status (server_info *sinfo, client_info *client,
@@ -697,12 +745,12 @@ void do_cmd_status (server_info *sinfo, client_info *client,
             cur_client != NULL;
             cur_client = cur_client->next)
         {
-            write_client_information (client->fd, cur_client);
+            write_client_information (client, cur_client);
         }
     } else if (write_info_for_myself) {
-        write_client_information (client->fd, client);
+        write_client_information (client, client);
     } else {
-        write_client_information (client->fd, pointed_client);
+        write_client_information (client, pointed_client);
     }
 }
 
