@@ -229,10 +229,20 @@ Your have not so much productions. Request rejected.\n\
 See information by \"status your_username\" command.\n";
 
 /* Command turn */
-const char msg_step_completed[] = "\
-Step already completed, wait for other clients.\n";
+const char msg_step_already_completed[] = "\
+This month already completed, wait for other clients.\n";
 const char msg_wait_clients[] = "\
 Server wait for full count of clients. Please wait.\n";
+/* msg_client defined in main.c and ld say:
+ * "multiple definition of `msg_client'". */
+const char msg_async_client[] = "\
+*** Client ";
+const char msg_step_completed[] = "\
+This month completed.\n";
+const char msg_complete_step[] = "\
+ completed this month.\n";
+const char msg_expected_clients[] = "\
+Expected: ";
 
 /* Wrong command */
 const char msg_cmd_wrong[] = "\
@@ -258,11 +268,15 @@ Connected: ";
 const char msg_game_ready[] = "\
 Game ready!\n";
 
+/* Process next step */
+const char msg_all_cl_step_completed[] = "\
+*** Yeah! All players completed this month!\n";
+
 /* Auxiliary messages */
 const char msg_newline[] = "\n";
 const char msg_dot_five[] = ".5";
-const char msg_numbers_separator_1[] = " / ";
-const char msg_numbers_separator_2[] = ", ";
+const char msg_two_numbers_separator[] = " / ";
+const char msg_list_separator[] = ", ";
 const char msg_nick_separator[] = " -> ";
 
 /* =========== */
@@ -571,14 +585,14 @@ void do_cmd_help (int write_fd, char *cmd_name)
 client_info *get_client_by_nick (client_info *first_client,
     const char *nick)
 {
-    client_info *cur_client;
+    client_info *cur_c;
 
-    for (cur_client = first_client;
-        cur_client != NULL;
-        cur_client = cur_client->next)
+    for (cur_c = first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
     {
-        if (STR_EQUAL (nick, cur_client->nick)) {
-            return cur_client;
+        if (STR_EQUAL (nick, cur_c->nick)) {
+            return cur_c;
         }
     }
 
@@ -653,8 +667,8 @@ void write_common_information (int write_fd, server_info *sinfo)
     write (write_fd, msg_market_raw_count,
         sizeof (msg_market_raw_count) - 1);
     write_number (write_fd, get_market_raw_count (sinfo), 0);
-    write (write_fd, msg_numbers_separator_1,
-        sizeof (msg_numbers_separator_1) - 1);
+    write (write_fd, msg_two_numbers_separator,
+        sizeof (msg_two_numbers_separator) - 1);
     write_number_half (write_fd,
         raw_count_per_player[sinfo->level], 0);
     write (write_fd, msg_in_all_per_player,
@@ -666,8 +680,8 @@ void write_common_information (int write_fd, server_info *sinfo)
     write (write_fd, msg_market_prod_count,
         sizeof (msg_market_prod_count) - 1);
     write_number (write_fd, get_market_prod_count (sinfo), 0);
-    write (write_fd, msg_numbers_separator_1,
-        sizeof (msg_numbers_separator_1) - 1);
+    write (write_fd, msg_two_numbers_separator,
+        sizeof (msg_two_numbers_separator) - 1);
     write_number_half (write_fd,
         prod_count_per_player[sinfo->level], 0);
     write (write_fd, msg_in_all_per_player,
@@ -682,8 +696,8 @@ void write_common_information (int write_fd, server_info *sinfo)
         write_number (write_fd,
             level_change_probability[sinfo->level][i], 0);
         if (i < 4) {
-            write (write_fd, msg_numbers_separator_2,
-                sizeof (msg_numbers_separator_2) - 1);
+            write (write_fd, msg_list_separator,
+                sizeof (msg_list_separator) - 1);
         }
     }
     write (write_fd, msg_probability_twelve,
@@ -759,7 +773,7 @@ void do_cmd_status (server_info *sinfo, client_info *client,
     int write_info_for_all_clients = 0;
     int write_info_for_myself = 0;
     client_info *pointed_client = NULL;
-    client_info *cur_client;
+    client_info *cur_c;
 
     if (nick == NULL) {
         write_info_for_myself = 1;
@@ -779,11 +793,11 @@ void do_cmd_status (server_info *sinfo, client_info *client,
     write_common_information (client->fd, sinfo);
 
     if (write_info_for_all_clients) {
-        for (cur_client = sinfo->first_client;
-            cur_client != NULL;
-            cur_client = cur_client->next)
+        for (cur_c = sinfo->first_client;
+            cur_c != NULL;
+            cur_c = cur_c->next)
         {
-            write_client_information (client, cur_client);
+            write_client_information (client, cur_c);
         }
     } else if (write_info_for_myself) {
         write_client_information (client, client);
@@ -870,10 +884,38 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
         sizeof (msg_request_stored) - 1);
 }
 
+void write_not_completed_step_clients (int write_fd, server_info *sinfo)
+{
+    client_info *cur_c;
+    int first_nick = 1;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->step_completed)
+            continue;
+
+        if (first_nick) {
+            write (write_fd, msg_expected_clients,
+                sizeof (msg_expected_clients) - 1);
+        } else {
+            write (write_fd, msg_list_separator,
+                sizeof (msg_list_separator) - 1);
+        }
+
+        write (write_fd, cur_c->nick, strlen (cur_c->nick));
+        first_nick = 0;
+    }
+
+    if (!first_nick)
+        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+}
+
 void do_cmd_turn (server_info *sinfo, client_info *client)
 {
-    client_info *cur_client;
-    int all_clients_step_completed;
+    client_info *cur_c;
+    int all_compl;
 
     if (sinfo->state == G_ST_WAIT_CLIENTS) {
         write (client->fd, msg_wait_clients,
@@ -882,25 +924,41 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
     }
 
     if (client->step_completed) {
-        write (client->fd, msg_step_completed,
-            sizeof (msg_step_completed) - 1);
+        write (client->fd, msg_step_already_completed,
+            sizeof (msg_step_already_completed) - 1);
         return;
     }
 
     client->step_completed = 1;
 
-    all_clients_step_completed = 1;
-    for (cur_client = sinfo->first_client;
-        cur_client != NULL;
-        cur_client = cur_client->next)
+    all_compl = 1;
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
     {
-        if (! cur_client->step_completed) {
-            all_clients_step_completed = 0;
-            break;
+        all_compl = all_compl && cur_c->step_completed;
+
+        if ((! cur_c->step_completed)
+            || cur_c == client)
+        {
+            continue;
         }
+
+        write (cur_c->fd, msg_async_client,
+            sizeof (msg_async_client) - 1);
+        write (cur_c->fd, client->nick,
+            strlen (client->nick));
+        write (cur_c->fd, msg_complete_step,
+            sizeof (msg_complete_step) - 1);
+        /* TODO: make it more optimal. */
+        write_not_completed_step_clients (cur_c->fd, sinfo);
     }
 
-    if (all_clients_step_completed) {
+    write (client->fd, msg_step_completed,
+        sizeof (msg_step_completed) - 1);
+    write_not_completed_step_clients (client->fd, sinfo);
+
+    if (all_compl) {
         game_process_next_step (sinfo);
     }
 }
@@ -1267,26 +1325,34 @@ void change_level (server_info *sinfo)
 
 void game_process_next_step (server_info *sinfo)
 {
-    client_info *cur_client;
+    client_info *cur_c;
     unsigned int market_raw_count = get_market_raw_count (sinfo);
     unsigned int market_prod_count = get_market_prod_count (sinfo);
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        write (cur_c->fd, msg_all_cl_step_completed,
+            sizeof (msg_all_cl_step_completed) - 1);
+    }
 
     buy_raw_auction (sinfo, market_raw_count);
     sell_prod_auction (sinfo, market_prod_count);
 
-    for (cur_client = sinfo->first_client;
-        cur_client != NULL;
-        cur_client = cur_client->next)
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
     {
-        grant_make_prod_request (cur_client);
-        grant_build_factories_request (cur_client);
-        after_step_expenses (cur_client);
+        grant_make_prod_request (cur_c);
+        grant_build_factories_request (cur_c);
+        after_step_expenses (cur_c);
 
-        if (cur_client->money < 0) {
-            process_client_bankrupt (sinfo, cur_client);
+        if (cur_c->money < 0) {
+            process_client_bankrupt (sinfo, cur_c);
         }
 
-        cur_client->step_completed = 0;
+        cur_c->step_completed = 0;
     } /* for */
 
     change_level (sinfo);
