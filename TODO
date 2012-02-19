@@ -33,7 +33,11 @@
 
 * Строящиеся фабрики и прочие request'ы в status'е.
 
+* Внести порядок в именование переменных и сообщения, передаваемые пользователю:
 * request -> offer?
+* step/month
+* player/user/client
+* nick/username
 
 * #define write_str(fd, str) write(fd, str, sizeof(str) - 1)
 * Where: http://code.turnkeylinux.org/busybox/networking/telnet.c
