@@ -191,6 +191,7 @@ Month completed: ";
 /* Requests */
 const char msg_requests_head[] = "\
 \n---Requests info---\n";
+/* TODO: write cost for each request. */
 const char msg_build_factory_count[] = "\
 Build factories:       ";
 const char msg_make_prod_count[] = "\
@@ -625,6 +626,9 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
             cur_c != NULL;
             cur_c = cur_c->next)
         {
+            if (cur_c == client)
+                continue;
+
             write (cur_c->fd, msg_nick_change,
                 sizeof (msg_nick_change) - 1);
             write (cur_c->fd, client->nick, strlen (client->nick));
