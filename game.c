@@ -142,7 +142,13 @@ Usernames starts with '-' are forbidden. Request rejected.\n";
 const char msg_nick_employed[] = "\
 Client with same nick already exists. Request rejected.\n";
 
+/* Asynchronous messages starts with "***". */
+const char msg_nick_change[] = "\
+*** Username change: ";
+
 /* Common information */
+const char msg_server_info_head[] = "\
+\n====Server info====\n";
 const char msg_cl_count[] = "\
 Connected:     ";
 const char msg_step[] = "\
@@ -152,7 +158,7 @@ Market level:  ";
 const char msg_market_info_head[] = "\
 \n====Market info====\n";
 const char msg_in_all_per_player[] = "\
-      (in all / per player)\n";
+          (in all / per player)\n";
 const char msg_market_raw_count[] = "\
 Raws on market:  ";
 const char msg_min_raw_price[] = "\
@@ -164,7 +170,7 @@ Max prod. price: ";
 const char msg_next_level[] = "\
 Next level:      ";
 const char msg_probability_twelve[] = "\
-      (probability * 12)\n";
+  (probability * 12)\n";
 
 /* Client information */
 const char msg_client_info_head[] = "\
@@ -241,11 +247,23 @@ This command is forbidden before start the game.\n";
 const char msg_bankrupt[] = "\
 You are bankrupt!\n";
 
+/* Process new client */
+const char msg_disconnect[] = "\
+Server full.\n";
+const char msg_new_client[] = "\
+*** Connected new client.\n\
+Username:  ";
+const char msg_cl_count_2[] = "\
+Connected: ";
+const char msg_game_ready[] = "\
+Game ready!\n";
+
 /* Auxiliary messages */
 const char msg_newline[] = "\n";
 const char msg_dot_five[] = ".5";
 const char msg_numbers_separator_1[] = " / ";
 const char msg_numbers_separator_2[] = ", ";
+const char msg_nick_separator[] = " -> ";
 
 /* =========== */
 
@@ -569,6 +587,8 @@ client_info *get_client_by_nick (client_info *first_client,
 
 void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
 {
+    client_info *cur_c;
+
     if (nick != NULL) {
         /* If starts with '-'. */
         if (*nick == '-') {
@@ -586,6 +606,21 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
             return;
         }
 
+        /* Messages for all clients. */
+        for (cur_c = sinfo->first_client;
+            cur_c != NULL;
+            cur_c = cur_c->next)
+        {
+            write (cur_c->fd, msg_nick_change,
+                sizeof (msg_nick_change) - 1);
+            write (cur_c->fd, client->nick, strlen (client->nick));
+            write (cur_c->fd, msg_nick_separator,
+                sizeof (msg_nick_separator) - 1);
+            write (cur_c->fd, nick, strlen (nick));
+            write (cur_c->fd, msg_newline,
+                sizeof (msg_newline) - 1);
+        }
+
         free (client->nick);
         client->nick = nick;
     }
@@ -598,6 +633,9 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
 void write_common_information (int write_fd, server_info *sinfo)
 {
     int i;
+
+    write (write_fd, msg_server_info_head,
+        sizeof (msg_server_info_head) - 1);
 
     write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
     write_number (write_fd, sinfo->clients_count, 1);
@@ -964,19 +1002,80 @@ int execute_cmd (server_info *sinfo,
     return (cmd->type != CMD_NICK);
 }
 
+char *first_vacant_nick (client_info *first_client)
+{
+    /* Why 12? See comment to number_to_str ().
+     * First position reserved for 'p' symbol. */
+    char *buf = (char *) malloc (12 * sizeof (char));
+    client_info *cur_c;
+    int nick_number = 0;
+    int nick_found;
+
+    *buf = 'p';
+
+    do {
+        nick_found = 0;
+        cur_c = first_client;
+        number_to_str (buf + 1, nick_number);
+
+        while (cur_c != NULL && !nick_found) {
+            if (cur_c->nick == NULL) {
+                nick_found = 0;
+            } else {
+                nick_found = STR_EQUAL (buf,
+                    cur_c->nick);
+            }
+            cur_c = cur_c->next;
+        }
+
+        ++nick_number;
+    } while (nick_found);
+
+    return buf;
+}
+
 /* Returns:
  * 0, if client connected
  * 1, if client count full. */
-int game_process_new_client (server_info *sinfo)
+int game_process_new_client (server_info *sinfo,
+    client_info *new_client)
 {
+    client_info *cur_c;
+
     if (sinfo->state != G_ST_WAIT_CLIENTS) {
+        write (new_client->fd, msg_disconnect,
+            sizeof (msg_disconnect) - 1);
+        client_disconnect (sinfo, new_client, 0, 1);
         return 1;
     }
 
     ++(sinfo->clients_count);
+    new_client->nick = first_vacant_nick (sinfo->first_client);
+
+    /* Messages for all clients. */
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        write (cur_c->fd, msg_new_client, sizeof (msg_new_client) - 1);
+        write (cur_c->fd, new_client->nick, strlen (new_client->nick));
+        write (cur_c->fd, msg_newline, sizeof (msg_newline) - 1);
+
+        write (cur_c->fd, msg_cl_count_2, sizeof (msg_cl_count_2) - 1);
+        write_number (cur_c->fd, sinfo->clients_count, 1);
+    }
+
     if (sinfo->clients_count == sinfo->expected_clients) {
         sinfo->state = G_ST_IN_GAME;
-        /* TODO: messages for clients. */
+
+        /* Messages for all clients. */
+        for (cur_c = sinfo->first_client;
+            cur_c != NULL;
+            cur_c = cur_c->next)
+        {
+            write (cur_c->fd, msg_game_ready,
+                sizeof (msg_game_ready) - 1);
+        }
     }
 
     return 0;

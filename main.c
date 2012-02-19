@@ -13,7 +13,7 @@ const char msg_protocol_parse_error[] = "\
 Protocol parse error.\n";
 
 const char msg_client[] = "\
-Client ";
+*** Client ";
 const char msg_disconnected[] = "\
  disconnected.\nReason: ";
 
@@ -27,38 +27,6 @@ const char msg_disc_bankrupting[] = "\
 bankrupting.\n";
 
 /* =========== */
-
-char *first_vacant_nick (client_info *first_client)
-{
-    /* Why 12? See comment to number_to_str ().
-     * First position reserved for 'p' symbol. */
-    char *buf = (char *) malloc (12 * sizeof (char));
-    client_info *cur_c;
-    int nick_number = 0;
-    int nick_found;
-
-    *buf = 'p';
-
-    do {
-        nick_found = 0;
-        cur_c = first_client;
-        number_to_str (buf + 1, nick_number);
-
-        while (cur_c != NULL && !nick_found) {
-            if (cur_c->nick == NULL) {
-                nick_found = 0;
-            } else {
-                nick_found = STR_EQUAL (buf,
-                    cur_c->nick);
-            }
-            cur_c = cur_c->next;
-        }
-
-        ++nick_number;
-    } while (nick_found);
-
-    return buf;
-}
 
 void print_prompt (client_info *client)
 {
@@ -254,7 +222,6 @@ void process_new_client (server_info *sinfo, int listening_socket)
     /* We not save information about client IP and port. */
     int client_socket = accept (listening_socket, NULL, NULL);
     client_info *new_client;
-    char msg_disconnect[] = "Server full.\n";
 
     if (ACCEPT_ERROR (client_socket)) {
         perror ("accept ()");
@@ -263,15 +230,10 @@ void process_new_client (server_info *sinfo, int listening_socket)
 
     new_client = new_client_info (client_socket);
 
-    if (game_process_new_client (sinfo)) {
-        write (client_socket, msg_disconnect,
-            sizeof (msg_disconnect) - 1);
-        client_disconnect (sinfo, new_client, 0, 1);
+    if (game_process_new_client (sinfo, new_client)) {
         free (new_client);
         return;
     }
-
-    new_client->nick = first_vacant_nick (sinfo->first_client);
 
     if (sinfo->first_client == NULL) {
         sinfo->last_client = sinfo->first_client = new_client;

@@ -33,7 +33,8 @@ void print_cmd (command *cmd);
 int execute_cmd (server_info *sinfo,
     client_info *client, command *cmd);
 
-int game_process_new_client (server_info *sinfo);
+int game_process_new_client (server_info *sinfo,
+    client_info *new_client);
 void game_process_next_step (server_info *sinfo);
 
 #endif
