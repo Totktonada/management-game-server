@@ -34,3 +34,12 @@
 * Строящиеся фабрики и прочие request'ы в status'е.
 
 * request -> offer?
+
+* #define write_str(fd, str) write(fd, str, sizeof(str) - 1)
+* Where: http://code.turnkeylinux.org/busybox/networking/telnet.c
+
+* Поддержка gettext, выстраивание отступов между ключом и значением
+* автоматически.
+
+* strlen (client->nick) — неоптимально. Посмотреть в сторону
+* http://schacon.github.com/git/technical/api-strbuf.html
