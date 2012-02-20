@@ -562,19 +562,19 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
             if (cur_c == client)
                 continue;
 
-            ADD_S (&(client->write_buf), "Username change: ");
-            ADD_S_STRLEN (&(client->write_buf), client->nick);
-            ADD_S (&(client->write_buf), " -> ");
-            ADD_S_STRLEN (&(client->write_buf), nick);
-            ADD_S (&(client->write_buf), "\n");
+            ADD_S (&(cur_c->write_buf), "Username change: ");
+            ADD_S_STRLEN (&(cur_c->write_buf), client->nick, 1);
+            ADD_S (&(cur_c->write_buf), " -> ");
+            ADD_S_STRLEN (&(cur_c->write_buf), nick, 0);
+            ADD_S (&(cur_c->write_buf), "\n");
         }
 
-        free (client->nick);
+        /* client->nick will be freed in msg_buffer. */
         client->nick = nick;
     }
 
     ADD_S (&(client->write_buf), "Your username: ");
-    ADD_S_STRLEN (&(client->write_buf), client->nick);
+    ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
     ADD_S (&(client->write_buf), "\n");
 }
 

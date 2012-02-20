@@ -259,6 +259,9 @@ void write_buffers_all_clients (server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        if (is_msg_buffer_empty (&(cur_c->write_buf)))
+            continue;
+
         /* Add prefix for asynchronous messages. */
         /* TODO: "\n*** [timespamp] ***\n" */
         if (cur_c != client)
