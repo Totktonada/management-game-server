@@ -22,22 +22,59 @@ typedef struct msg_buffer {
 } msg_buffer;
 
 void new_msg_buffer (msg_buffer *buf);
+void add_prefix_to_msg_buffer (msg_buffer *buf,
+    const char *prefix, unsigned int prefix_length);
 void add_str_to_msg_buffer (msg_buffer *buf,
-    char *str, unsigned int str_length);
+    const char *str, unsigned int str_length);
 void add_number_to_msg_buffer (msg_buffer *buf,
     unsigned int number);
 void write_msg_buffer (msg_buffer *buf, int write_fd);
+void add_half_to_msg_buffer (msg_buffer *buf,
+    unsigned int number);
 
-#define ADD_S(buf, str); \
-add_str_to_msg_buffer (buf, str, sizeof (str) - 1);
+/* Abbreviation components:
+ * S - string;
+ * N - number;
+ * H - half of number; */
 
-#define ADD_SN(buf, str, number); \
-add_str_to_msg_buffer (buf, str, sizeof (str) - 1); \
-add_number_to_msg_buffer (buf, number);
+#define ADD_PREFIX(buf, prefix) \
+do { \
+    add_prefix_to_msg_buffer (buf, prefix, \
+        sizeof (prefix) - 1); \
+} while (0)
 
-#define ADD_SNS(buf, str1, number, str2); \
-add_str_to_msg_buffer (buf, str1, sizeof (str1) - 1); \
-add_number_to_msg_buffer (buf, number); \
-add_str_to_msg_buffer (buf, str2, sizeof (str2) - 1);
+#define ADD_S(buf, s1) \
+do { \
+    add_str_to_msg_buffer (buf, s1, sizeof (s1) - 1); \
+} while (0)
+
+#define ADD_S_STRLEN(buf, s1) \
+do { \
+    add_str_to_msg_buffer (buf, s1, strlen (s1)); \
+} while (0)
+
+#define ADD_N(buf, n1) \
+do { \
+    add_number_to_msg_buffer (buf, n1); \
+} while (0)
+
+#define ADD_SNS(buf, s1, n1, s2) \
+do { \
+    add_str_to_msg_buffer (buf, s1, sizeof (s1) - 1); \
+    add_number_to_msg_buffer (buf, n1); \
+    add_str_to_msg_buffer (buf, s2, sizeof (s2) - 1); \
+} while (0)
+
+#define ADD_SNSHS(buf, s1, n1, s2, n2, s3) \
+do { \
+    add_str_to_msg_buffer (buf, s1, sizeof (s1) - 1); \
+    add_number_to_msg_buffer (buf, n1); \
+    add_str_to_msg_buffer (buf, s2, sizeof (s2) - 1); \
+    add_half_to_msg_buffer (buf, n2); \
+    add_str_to_msg_buffer (buf, s3, sizeof (s3) - 1); \
+} while (0)
+
+/* Similar macro I see in [1]. See "#define write_str".
+ * [1] http://code.turnkeylinux.org/busybox/networking/telnet.c */
 
 #endif

@@ -34,7 +34,25 @@ msg_block *new_number_msg_block (const int number, int *str_length)
     return new_msg_block;
 }
 
-void add_str_to_msg_buffer (msg_buffer *buf, char *str,
+void add_prefix_to_msg_buffer (msg_buffer *buf, const char *prefix,
+    unsigned int prefix_length)
+{
+    msg_block *tmp_block;
+
+    if (buf->first_block == NULL) {
+        buf->last_block = buf->first_block =
+            new_str_msg_block (prefix, prefix_length);
+    } else {
+        tmp_block =
+            new_str_msg_block (prefix, prefix_length);
+        tmp_block->next = buf->first_block;
+        buf->first_block = tmp_block;
+    }
+
+    buf->common_length += prefix_length;
+}
+
+void add_str_to_msg_buffer (msg_buffer *buf, const char *str,
     unsigned int str_length)
 {
     if (buf->first_block == NULL) {
@@ -62,6 +80,15 @@ void add_number_to_msg_buffer (msg_buffer *buf,
     }
 
     buf->common_length += str_length;
+}
+
+/* TODO: maybe make it as inline? */
+void add_half_to_msg_buffer (msg_buffer *buf, unsigned int number)
+{
+    add_number_to_msg_buffer (buf, (unsigned int) (number / 2));
+    if (number % 2) {
+        add_str_to_msg_buffer (buf, ".5", sizeof (".5") - 1);
+    }
 }
 
 /* Make one string from msg_buffer
@@ -99,12 +126,19 @@ char *msg_buffer_to_string (msg_buffer *buf)
 }
 
 /* Write msg_buffer contents.
+ * If buf->common_length is zero, do nothing.
  * msg_buffer is cleared (see comment
  * to msg_buffer_to_string ()). */
 void write_msg_buffer (msg_buffer *buf, int write_fd)
 {
-    int length = buf->common_length;
-    char *str = msg_buffer_to_string (buf);
+    int length;
+    char *str;
+
+    if (buf->common_length == 0)
+        return;
+
+    length = buf->common_length;
+    str = msg_buffer_to_string (buf);
 
     write (write_fd, str, length);
     free (str);

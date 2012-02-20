@@ -22,6 +22,7 @@
 
 #include "parser.h"
 #include "utils.h"
+#include "msg_buffer.h"
 
 /* Exit status, if one of next system calls failed:
  * fork/socket/inet_aton/bind/listen/select/accept. */
@@ -56,11 +57,15 @@ typedef struct request {
 */
 
 typedef struct client_info {
+    /* Common */
+    struct client_info *next;
     int fd;
+    /* Read */
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
     parser_info pinfo;
-    struct client_info *next;
+    /* Write */
+    msg_buffer write_buf;
     /* Client game data */
     char *nick;
     int money;
@@ -98,7 +103,7 @@ typedef struct request_group {
 } request_group;
 
 typedef struct server_info {
-    /* Connecting data. */
+    /* Connecting data */
     int listening_port;
     int listening_socket;
     fd_set read_fds;
@@ -106,7 +111,7 @@ typedef struct server_info {
     client_info *first_client;
     client_info *last_client;
     int expected_clients;
-    /* Game data. */
+    /* Game data */
     unsigned int clients_count;
     game_state state;
     unsigned int step;

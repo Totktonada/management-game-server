@@ -138,12 +138,13 @@ client_info *new_client_info (int client_socket)
 {
     client_info *client = (client_info *)
         malloc (sizeof (client_info));
+    client->next = NULL;
     client->fd = client_socket;
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info (&(client->pinfo));
-    client->next = NULL;
     new_client_game_data (client);
+    new_msg_buffer (&(client->write_buf));
     return client;
 }
 
@@ -249,6 +250,24 @@ void process_new_client (server_info *sinfo, int listening_socket)
     print_prompt (new_client);
 }
 
+void write_buffers_all_clients (server_info *sinfo,
+    client_info *client)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        /* Add prefix for asynchronous messages. */
+        /* TODO: "\n*** [timespamp] ***\n" */
+        if (cur_c != client)
+            ADD_PREFIX (&(cur_c->write_buf), "*** ");
+
+        write_msg_buffer (&(cur_c->write_buf), cur_c->fd);
+    }
+}
+
 void process_readed_data (server_info *sinfo, client_info *client)
 {
     command *cmd;
@@ -277,6 +296,8 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #endif
         destroy_str = execute_cmd (sinfo, client, cmd);
         destroy_cmd (cmd, destroy_str);
+         /* TODO: use select */
+        write_buffers_all_clients (sinfo, client);
         print_prompt (client);
     } while (1);
 }

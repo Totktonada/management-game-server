@@ -9,6 +9,7 @@
 #include "parser.h"
 #include "utils.h"
 #include "main.h"
+#include "msg_buffer.h"
 
 #define START_MONEY 10000
 #define START_RAW_COUNT 4

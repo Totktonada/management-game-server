@@ -135,44 +135,6 @@ const char msg_help_cmd_wrong[] = "\
 Unknown command. See \"help\" (without argumenst)\n\
 for available commands list.\n";
 
-/* Command nick */
-const char msg_your_nick[] = "\
-Your username: ";
-const char msg_nick_forbid[] = "\
-Usernames starts with '-' are forbidden. Request rejected.\n";
-const char msg_nick_employed[] = "\
-Client with same nick already exists. Request rejected.\n";
-
-/* Asynchronous messages starts with "***". */
-const char msg_nick_change[] = "\
-*** Username change: ";
-
-/* Common information */
-const char msg_server_info_head[] = "\
-\n====Server info====\n";
-const char msg_cl_count[] = "\
-Connected:     ";
-const char msg_step[] = "\
-Current month: ";
-const char msg_market_level[] = "\
-Market level:  ";
-const char msg_market_info_head[] = "\
-\n====Market info====\n";
-const char msg_in_all_per_player[] = "\
-          (in all / per player)\n";
-const char msg_market_raw_count[] = "\
-Raws on market:  ";
-const char msg_min_raw_price[] = "\
-Min raw price:   ";
-const char msg_market_prod_count[] = "\
-Productions:     ";
-const char msg_max_prod_price[] = "\
-Max prod. price: ";
-const char msg_next_level[] = "\
-Next level:      ";
-const char msg_probability_twelve[] = "\
-  (probability * 12)\n";
-
 /* Client information */
 const char msg_client_info_head[] = "\
 \n====Client info====\n";
@@ -276,10 +238,7 @@ const char msg_all_cl_step_completed[] = "\
 
 /* Auxiliary messages */
 const char msg_newline[] = "\n";
-const char msg_dot_five[] = ".5";
-const char msg_two_numbers_separator[] = " / ";
 const char msg_list_separator[] = ", ";
-const char msg_nick_separator[] = " -> ";
 
 /* =========== */
 
@@ -492,6 +451,7 @@ void print_cmd (command *cmd)
 }
 #endif
 
+/* TODO: remove. */
 /* Print number to descriptor write_fd.
  * If (newline != 0), then write newline after number. */
 void write_number (int write_fd, unsigned int number, int newline)
@@ -507,72 +467,44 @@ void write_number (int write_fd, unsigned int number, int newline)
         write (write_fd, msg_newline, sizeof (msg_newline) - 1);
 }
 
-/* Print (number / 2) to descriptor write_fd.
- * If (newline != 0), then write newline after number. */
-void write_number_half (int write_fd, unsigned int number, int newline)
-{
-    /* Why 11? See comment to number_to_str (). */
-    char *buf = (char *) malloc (11 * sizeof (char));
-    int size = number_to_str (buf, (unsigned int) (number / 2));
-
-    write (write_fd, buf, size);
-    free (buf);
-
-    if ((number % 2) == 1)
-        write (write_fd, msg_dot_five, sizeof (msg_dot_five) - 1);
-
-    if (newline)
-        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
-}
-
-void do_cmd_help (int write_fd, char *cmd_name)
+/* See msg_help_* strings in top of this file. */
+void do_cmd_help (client_info *client, char *cmd_name)
 {
     if (cmd_name == NULL) {
-        write (write_fd, msg_help_common_part1,
-            sizeof (msg_help_common_part1) - 1);
-        write (write_fd, msg_help_common_part2,
-            sizeof (msg_help_common_part2) - 1);
+        ADD_S (&(client->write_buf), msg_help_common_part1);
+        ADD_S (&(client->write_buf), msg_help_common_part2);
         return;
     }
 
     switch (get_cmd_type (cmd_name)) {
     case CMD_HELP:
-        write (write_fd, msg_help_cmd_help,
-            sizeof (msg_help_cmd_help) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_help);
         break;
     case CMD_NICK:
-        write (write_fd, msg_help_cmd_nick,
-            sizeof (msg_help_cmd_nick) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_nick);
         break;
     case CMD_STATUS:
-        write (write_fd, msg_help_cmd_status,
-            sizeof (msg_help_cmd_status) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_status);
         break;
     case CMD_BUILD:
-        write (write_fd, msg_help_cmd_build,
-            sizeof (msg_help_cmd_build) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_build);
         break;
     case CMD_PROD:
         /* TODO: information about cost of one production. */
-        write (write_fd, msg_help_cmd_prod,
-            sizeof (msg_help_cmd_prod) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_prod);
         break;
     case CMD_BUY:
-        write (write_fd, msg_help_cmd_buy,
-            sizeof (msg_help_cmd_buy) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_buy);
         break;
     case CMD_SELL:
-        write (write_fd, msg_help_cmd_sell,
-            sizeof (msg_help_cmd_sell) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_sell);
         break;
     case CMD_TURN:
-        write (write_fd, msg_help_cmd_turn,
-            sizeof (msg_help_cmd_turn) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_turn);
         break;
     case CMD_WRONG:
         /* Unknown command. */
-        write (write_fd, msg_help_cmd_wrong,
-            sizeof (msg_help_cmd_wrong) - 1);
+        ADD_S (&(client->write_buf), msg_help_cmd_wrong);
         break;
     case CMD_EMPTY:
     case CMD_PROTOCOL_PARSE_ERROR:
@@ -609,16 +541,16 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
         /* If starts with '-'. */
         if (*nick == '-') {
             free (nick);
-            write (client->fd, msg_nick_forbid,
-                sizeof (msg_nick_forbid) - 1);
+            ADD_S (&(client->write_buf),
+"Usernames starts with '-' are forbidden. Request rejected.\n");
             return;
         }
 
         /* If already exists. */
         if (get_client_by_nick (sinfo->first_client, nick) != NULL) {
             free (nick);
-            write (client->fd, msg_nick_employed,
-                sizeof (msg_nick_employed) - 1);
+            ADD_S (&(client->write_buf),
+"Client with same nick already exists. Request rejected.\n");
             return;
         }
 
@@ -630,83 +562,65 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
             if (cur_c == client)
                 continue;
 
-            write (cur_c->fd, msg_nick_change,
-                sizeof (msg_nick_change) - 1);
-            write (cur_c->fd, client->nick, strlen (client->nick));
-            write (cur_c->fd, msg_nick_separator,
-                sizeof (msg_nick_separator) - 1);
-            write (cur_c->fd, nick, strlen (nick));
-            write (cur_c->fd, msg_newline,
-                sizeof (msg_newline) - 1);
+            ADD_S (&(client->write_buf), "Username change: ");
+            ADD_S_STRLEN (&(client->write_buf), client->nick);
+            ADD_S (&(client->write_buf), " -> ");
+            ADD_S_STRLEN (&(client->write_buf), nick);
+            ADD_S (&(client->write_buf), "\n");
         }
 
         free (client->nick);
         client->nick = nick;
     }
 
-    write (client->fd, msg_your_nick, sizeof (msg_your_nick) - 1);
-    write (client->fd, client->nick, strlen (client->nick));
-    write (client->fd, msg_newline, sizeof (msg_newline) - 1);
+    ADD_S (&(client->write_buf), "Your username: ");
+    ADD_S_STRLEN (&(client->write_buf), client->nick);
+    ADD_S (&(client->write_buf), "\n");
 }
 
-void write_common_information (int write_fd, server_info *sinfo)
+/* TODO: maybe deliver &(client->write_buf), not client. */
+void write_common_information (client_info *client, server_info *sinfo)
 {
     int i;
 
-    write (write_fd, msg_server_info_head,
-        sizeof (msg_server_info_head) - 1);
-
-    write (write_fd, msg_cl_count, sizeof (msg_cl_count) - 1);
-    write_number (write_fd, sinfo->clients_count, 1);
-
-    write (write_fd, msg_step, sizeof (msg_step) - 1);
-    write_number (write_fd, sinfo->step, 1);
-
-    write (write_fd, msg_market_level, sizeof (msg_market_level) - 1);
+    ADD_S (&(client->write_buf),
+"\n====Server info====\n");
+    ADD_SNS (&(client->write_buf),
+"Connected:     ", sinfo->clients_count, "\n");
+    ADD_SNS (&(client->write_buf),
+"Current month: ", sinfo->step, "\n");
     /* sinfo->level is index. */
-    write_number (write_fd, sinfo->level + 1, 1);
+    ADD_SNS (&(client->write_buf),
+"Market level:  ", sinfo->level + 1, "\n");
 
-    write (write_fd, msg_market_info_head,
-        sizeof (msg_market_info_head) - 1);
+    ADD_S (&(client->write_buf),
+"\n====Market info====\n");
+    ADD_SNSHS (&(client->write_buf),
+"Raws on market:  ",
+get_market_raw_count (sinfo), " / ",
+raw_count_per_player[sinfo->level],
+"          (in all / per player)\n");
+    ADD_SNS (&(client->write_buf),
+"Min raw price:   ", min_raw_price[sinfo->level], "\n");
+    ADD_SNSHS (&(client->write_buf),
+"Productions:     ",
+get_market_prod_count (sinfo), " / ",
+prod_count_per_player[sinfo->level],
+"          (in all / per player)\n");
+    ADD_SNS (&(client->write_buf),
+"Max prod. price: ", max_prod_price[sinfo->level], "\n");
+    ADD_S (&(client->write_buf),
+"Next level:      ");
 
-    write (write_fd, msg_market_raw_count,
-        sizeof (msg_market_raw_count) - 1);
-    write_number (write_fd, get_market_raw_count (sinfo), 0);
-    write (write_fd, msg_two_numbers_separator,
-        sizeof (msg_two_numbers_separator) - 1);
-    write_number_half (write_fd,
-        raw_count_per_player[sinfo->level], 0);
-    write (write_fd, msg_in_all_per_player,
-        sizeof (msg_in_all_per_player) - 1);
-
-    write (write_fd, msg_min_raw_price, sizeof (msg_min_raw_price) - 1);
-    write_number (write_fd, min_raw_price[sinfo->level], 1);
-
-    write (write_fd, msg_market_prod_count,
-        sizeof (msg_market_prod_count) - 1);
-    write_number (write_fd, get_market_prod_count (sinfo), 0);
-    write (write_fd, msg_two_numbers_separator,
-        sizeof (msg_two_numbers_separator) - 1);
-    write_number_half (write_fd,
-        prod_count_per_player[sinfo->level], 0);
-    write (write_fd, msg_in_all_per_player,
-        sizeof (msg_in_all_per_player) - 1);
-
-    write (write_fd, msg_max_prod_price, sizeof (msg_max_prod_price) - 1);
-    write_number (write_fd, max_prod_price[sinfo->level], 1);
-
-    write (write_fd, msg_next_level,
-        sizeof (msg_next_level) - 1);
     for (i = 0; i < 5; ++i) {
-        write_number (write_fd,
-            level_change_probability[sinfo->level][i], 0);
+        ADD_N (&(client->write_buf),
+            level_change_probability[sinfo->level][i]);
         if (i < 4) {
-            write (write_fd, msg_list_separator,
-                sizeof (msg_list_separator) - 1);
+            ADD_S (&(client->write_buf), ", ");
+        } else {
+            ADD_S (&(client->write_buf), "  (probability * 12)\n");
         }
     }
-    write (write_fd, msg_probability_twelve,
-        sizeof (msg_probability_twelve) - 1);
 }
 
 /* TODO: nick -> username ? */
@@ -795,7 +709,7 @@ void do_cmd_status (server_info *sinfo, client_info *client,
         }
     }
 
-    write_common_information (client->fd, sinfo);
+    write_common_information (client, sinfo);
 
     if (write_info_for_all_clients) {
         for (cur_c = sinfo->first_client;
@@ -968,10 +882,10 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
     }
 }
 
-void do_cmd_wrong (int write_fd)
+void do_cmd_wrong (client_info *client)
 {
     /* Write string without '\0'. */
-    write (write_fd, msg_cmd_wrong, sizeof (msg_cmd_wrong) - 1);
+    write (client->fd, msg_cmd_wrong, sizeof (msg_cmd_wrong) - 1);
 }
 
 /* Returns:
@@ -1029,7 +943,7 @@ int execute_cmd (server_info *sinfo,
         /* Do nothing. */
         break;
     case CMD_HELP:
-        do_cmd_help (client->fd, cmd->value.str);
+        do_cmd_help (client, cmd->value.str);
         break;
     case CMD_NICK:
         do_cmd_nick (sinfo, client, cmd->value.str);
@@ -1055,7 +969,7 @@ int execute_cmd (server_info *sinfo,
         do_cmd_turn (sinfo, client);
         break;
     case CMD_WRONG:
-        do_cmd_wrong (client->fd);
+        do_cmd_wrong (client);
         break;
     case CMD_PROTOCOL_PARSE_ERROR:
         /* Not possible */
