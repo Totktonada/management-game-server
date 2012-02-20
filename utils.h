@@ -15,5 +15,6 @@ type_of_cmd get_cmd_type (char *str);
 unsigned int number_to_str (char *buf,
     unsigned int number);
 unsigned int get_random (unsigned int max_value);
+unsigned int log10i (unsigned int number);
 
 #endif

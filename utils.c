@@ -55,3 +55,18 @@ unsigned int get_random (unsigned int max_value)
     return (unsigned int) (max_value * rand ()
         / (RAND_MAX + 1.0));
 }
+
+/* Length of number string representation:
+ * log10i (number) + 1 . */
+unsigned int log10i (unsigned int number)
+{
+    unsigned int i = 0;
+    unsigned int del = 1;
+
+    while (number / 10 >= del) {
+        ++i;
+        del *= 10;
+    }
+
+    return i;
+}
