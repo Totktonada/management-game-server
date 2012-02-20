@@ -31,6 +31,7 @@ const unsigned int level_change_probability[5][5] = {
 /* String splitted to two part, because gcc
  * makes warning on strings longer 509 symbols. */
 const char msg_help_common_part1[] = "\
+\n\
 Available commands:\n\
 * help [command]\n\
 * nick [string]\n\
