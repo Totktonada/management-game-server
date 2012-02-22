@@ -44,6 +44,7 @@ Available commands:\n\
 \n\
 Command parser is case insensitive and have fun,\n\
 when you type commands in uppercase.\n\n";
+
 const char msg_help_common_part2[] = "\
 Rules you can see in book [1] or [2]. Also, very\n\
 short and not full instructions you can find in\n\
@@ -54,18 +55,21 @@ Books:\n\
     (the book has english and russian releases).\n\
 [2] http://www.stolyarov.info/books/gameserv\n\
     (only in russian).\n";
+
 const char msg_help_cmd_help[] = "\
 help [command]\n\
 \n\
 If have not argument, print available commands.\n\
 If argument is command name, print short help\n\
 about this command.\n";
+
 const char msg_help_cmd_nick[] = "\
 nick [string]\n\
 \n\
 If have not argument, simply print your username.\n\
 Otherwise, change your username to \"string\".\n\
 Usernames starts with '-' are forbidden.\n";
+
 const char msg_help_cmd_status[] = "\
 status [username | --all | -a]\n\
 \n\
@@ -79,6 +83,9 @@ Command have three forms:\n\
 3. status [--all | -a]\n\
    Print common information and information about all\n\
    connected clients.\n";
+
+/* TODO: use MAKE_FACTORY_FIRST_HALF
+ * and MAKE_FACTORY_SECOND_HALF macro. */
 const char msg_help_cmd_build[] = "\
 build count\n\
 \n\
@@ -87,15 +94,15 @@ One factory cost:\n\
 * 2500 after current step\n\
 * and 2500 after (current + 5) step.\n\
 After second payment, count factories is ready to work.\n";
-/* TODO: use MAKE_FACTORY_FIRST_HALF
- * and MAKE_FACTORY_SECOND_HALF macro. */
+
+/* TODO: use MAKE_PROD_COST macro. */
 const char msg_help_cmd_prod[] = "\
 prod count\n\
 \n\
 Make production on your factories.\n\
 One factory can make one production in one step.\n\
 One production cost: 2000.\n";
-/* TODO: use MAKE_PROD_COST macro. */
+
 const char msg_help_cmd_buy[] = "\
 buy count cost\n\
 \n\
@@ -107,6 +114,7 @@ Minimum cost of requested raw limited by some value\n\
 \n\
 For information about current market level, see \"status\"\n\
 command.\n";
+
 const char msg_help_cmd_sell[] = "\
 sell count cost\n\
 \n\
@@ -118,6 +126,7 @@ Maximum cost of offered production limited by some value\n\
 \n\
 For information about current market level, see \"status\"\n\
 command.\n";
+
 const char msg_help_cmd_turn[] = "\
 turn\n\
 \n\
@@ -131,114 +140,23 @@ Expenses:\n\
 * 1000 for one factory;\n\
 Raws, productions and factories counts used in expenses\n\
 calculation after processing all requests and offers.\n";
+
 const char msg_help_cmd_wrong[] = "\
 Unknown command. See \"help\" (without argumenst)\n\
 for available commands list.\n";
 
-/* Client information */
-const char msg_client_info_head[] = "\
-\n====Client info====\n";
-const char msg_nick[] = "\
-Username:        ";
-const char msg_money[] = "\
-Money:           ";
-const char msg_raw_count[] = "\
-Raws:            ";
-const char msg_prod_count[] = "\
-Productions:     ";
-const char msg_factory_count[] = "\
-Factories:       ";
-const char msg_is_step_completed[] = "\
-Month completed: ";
-
-/* Requests */
-const char msg_requests_head[] = "\
-\n---Requests info---\n";
-/* TODO: write cost for each request. */
-const char msg_build_factory_count[] = "\
-Build factories:       ";
-const char msg_make_prod_count[] = "\
-Make productions:      ";
-const char msg_building_factories_1[] = "\
-1 month old factories: ";
-const char msg_building_factories_2[] = "\
-2 month old factories: ";
-const char msg_building_factories_3[] = "\
-3 month old factories: ";
-const char msg_building_factories_4[] = "\
-4 month old factories: ";
-
-/* Command status */
-const char msg_client_not_found[] = "\
-Client with same username not found, try \"status --all\".\n";
-
-/* For requests. */
+/* "OK" response, for commands with request semantic. */
 const char msg_request_stored[] = "\
 Okay! Your request stored to after-step processing.\n";
 
-/* For requests. Command prod. */
-const char msg_too_few_factories[] = "\
-You have too few factories. Request rejected.\n\
-See information by \"status\" command.\n";
-
-/* For requests. Commands buy and sell. */
+/* For do_cmd_buy () and do_cmd_sell (). */
 const char msg_cost_out_of_range[] = "\
 Your cost is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
+
 const char msg_count_out_of_range[] = "\
 Your count is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
-const char msg_have_not_prod[] = "\
-Your have not so much productions. Request rejected.\n\
-See information by \"status your_username\" command.\n";
-
-/* Command turn */
-const char msg_step_already_completed[] = "\
-This month already completed, wait for other clients.\n";
-const char msg_wait_clients[] = "\
-Server wait for full count of clients. Please wait.\n";
-/* msg_client defined in main.c and ld say:
- * "multiple definition of `msg_client'". */
-const char msg_async_client[] = "\
-*** Client ";
-const char msg_step_completed[] = "\
-This month completed.\n";
-const char msg_complete_step[] = "\
- completed this month.\n";
-const char msg_expected_clients[] = "\
-Expected: ";
-
-/* Wrong command */
-const char msg_cmd_wrong[] = "\
-Wrong command or argument(s). See \"help\"\n\
-for information about available commands.\n";
-
-/* Command allowing */
-const char msg_not_in_game[] = "\
-This command is forbidden before start the game.\n";
-
-/* Process client bankrupt */
-const char msg_bankrupt[] = "\
-You are bankrupt!\n";
-
-/* Process new client */
-const char msg_disconnect[] = "\
-Server full.\n";
-const char msg_new_client[] = "\
-*** Connected new client.\n\
-Username:  ";
-const char msg_cl_count_2[] = "\
-Connected: ";
-const char msg_game_ready[] = "\
-Game ready!\n";
-
-/* Process next step */
-const char msg_all_cl_step_completed[] = "\
-*** Yeah! All players completed this month!\n";
-
-/* Auxiliary messages */
-const char msg_newline[] = "\n";
-const char msg_list_separator[] = ", ";
 
 /* =========== */
 
@@ -451,22 +369,6 @@ void print_cmd (command *cmd)
 }
 #endif
 
-/* TODO: remove. */
-/* Print number to descriptor write_fd.
- * If (newline != 0), then write newline after number. */
-void write_number (int write_fd, unsigned int number, int newline)
-{
-    /* Why 11? See comment to number_to_str (). */
-    char *buf = (char *) malloc (11 * sizeof (char));
-    int size = number_to_str (buf, number);
-
-    write (write_fd, buf, size);
-    free (buf);
-
-    if (newline)
-        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
-}
-
 /* See msg_help_* strings in top of this file. */
 void do_cmd_help (client_info *client, char *cmd_name)
 {
@@ -579,46 +481,54 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
 }
 
 /* TODO: maybe deliver &(client->write_buf), not client. */
-void write_common_information (client_info *client, server_info *sinfo)
+void write_common_information (server_info *sinfo, client_info *to_client)
 {
     int i;
 
-    ADD_S (&(client->write_buf),
+    ADD_S (&(to_client->write_buf),
 "\n====Server info====\n");
-    ADD_SNS (&(client->write_buf),
+
+    ADD_SNS (&(to_client->write_buf),
 "Connected:     ", sinfo->clients_count, "\n");
-    ADD_SNS (&(client->write_buf),
+
+    ADD_SNS (&(to_client->write_buf),
 "Current month: ", sinfo->step, "\n");
+
     /* sinfo->level is index. */
-    ADD_SNS (&(client->write_buf),
+    ADD_SNS (&(to_client->write_buf),
 "Market level:  ", sinfo->level + 1, "\n");
 
-    ADD_S (&(client->write_buf),
+    ADD_S (&(to_client->write_buf),
 "\n====Market info====\n");
-    ADD_SNSHS (&(client->write_buf),
+
+    ADD_SNSHS (&(to_client->write_buf),
 "Raws on market:  ",
 get_market_raw_count (sinfo), " / ",
 raw_count_per_player[sinfo->level],
 "          (in all / per player)\n");
-    ADD_SNS (&(client->write_buf),
+
+    ADD_SNS (&(to_client->write_buf),
 "Min raw price:   ", min_raw_price[sinfo->level], "\n");
-    ADD_SNSHS (&(client->write_buf),
+
+    ADD_SNSHS (&(to_client->write_buf),
 "Productions:     ",
 get_market_prod_count (sinfo), " / ",
 prod_count_per_player[sinfo->level],
 "          (in all / per player)\n");
-    ADD_SNS (&(client->write_buf),
+
+    ADD_SNS (&(to_client->write_buf),
 "Max prod. price: ", max_prod_price[sinfo->level], "\n");
-    ADD_S (&(client->write_buf),
+
+    ADD_S (&(to_client->write_buf),
 "Next level:      ");
 
     for (i = 0; i < 5; ++i) {
-        ADD_N (&(client->write_buf),
+        ADD_N (&(to_client->write_buf),
             level_change_probability[sinfo->level][i]);
         if (i < 4) {
-            ADD_S (&(client->write_buf), ", ");
+            ADD_S (&(to_client->write_buf), ", ");
         } else {
-            ADD_S (&(client->write_buf), "  (probability * 12)\n");
+            ADD_S (&(to_client->write_buf), "  (probability * 12)\n");
         }
     }
 }
@@ -627,61 +537,55 @@ prod_count_per_player[sinfo->level],
 void write_client_information (client_info *to_client,
     client_info *about_client)
 {
-    write (to_client->fd, msg_client_info_head,
-        sizeof (msg_client_info_head) - 1);
+    ADD_S (&(to_client->write_buf),
+"\n====Client info====\n");
 
-    write (to_client->fd, msg_nick, sizeof (msg_nick) - 1);
-    write (to_client->fd, about_client->nick,
-        strlen (about_client->nick));
-    write (to_client->fd, msg_newline, sizeof (msg_newline) - 1);
+    ADD_S (&(to_client->write_buf),
+"Username:        ");
+    ADD_S_STRLEN (&(to_client->write_buf), about_client->nick, 0);
+    ADD_S (&(to_client->write_buf), "\n");
 
-    write (to_client->fd, msg_money, sizeof (msg_money) - 1);
-    write_number (to_client->fd, about_client->money, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Money:           ", about_client->money, "\n");
 
-    write (to_client->fd, msg_raw_count, sizeof (msg_raw_count) - 1);
-    write_number (to_client->fd, about_client->raw_count, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Raws:            ", about_client->raw_count, "\n");
 
-    write (to_client->fd, msg_prod_count, sizeof (msg_prod_count) - 1);
-    write_number (to_client->fd, about_client->prod_count, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Productions:     ", about_client->prod_count, "\n");
 
-    write (to_client->fd, msg_factory_count,
-        sizeof (msg_factory_count) - 1);
-    write_number (to_client->fd, about_client->factory_count, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Factories:       ", about_client->factory_count, "\n");
 
-    write (to_client->fd, msg_is_step_completed,
-        sizeof (msg_is_step_completed) - 1);
-    write_number (to_client->fd, about_client->step_completed, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Month completed: ", about_client->step_completed, "\n");
     /* TODO: write "true" or "false". */
 
     if (to_client != about_client)
         return;
 
-    write (to_client->fd, msg_requests_head,
-        sizeof (msg_requests_head) - 1);
+/* TODO: write cost for each request. */
 
-    write (to_client->fd, msg_build_factory_count,
-        sizeof (msg_build_factory_count) - 1);
-    write_number (to_client->fd, about_client->build_factory_count, 1);
+    ADD_S (&(to_client->write_buf),
+"\n---Requests info---\n");
 
-    write (to_client->fd, msg_make_prod_count,
-        sizeof (msg_make_prod_count) - 1);
-    write_number (to_client->fd, about_client->make_prod_count, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Build factories:       ", about_client->build_factory_count, "\n");
 
-    write (to_client->fd, msg_building_factories_1,
-        sizeof (msg_building_factories_1) - 1);
-    write_number (to_client->fd, about_client->building_factory_1, 1);
+    ADD_SNS (&(to_client->write_buf),
+"Make productions:      ", about_client->make_prod_count, "\n");
 
-    write (to_client->fd, msg_building_factories_2,
-        sizeof (msg_building_factories_2) - 1);
-    write_number (to_client->fd, about_client->building_factory_2, 1);
+    ADD_SNS (&(to_client->write_buf),
+"1 month old factories: ", about_client->building_factory_1, "\n");
 
-    write (to_client->fd, msg_building_factories_3,
-        sizeof (msg_building_factories_3) - 1);
-    write_number (to_client->fd, about_client->building_factory_3, 1);
+    ADD_SNS (&(to_client->write_buf),
+"2 month old factories: ", about_client->building_factory_2, "\n");
 
-    write (to_client->fd, msg_building_factories_4,
-        sizeof (msg_building_factories_4) - 1);
-    write_number (to_client->fd, about_client->building_factory_4, 1);
+    ADD_SNS (&(to_client->write_buf),
+"3 month old factories: ", about_client->building_factory_3, "\n");
+
+    ADD_SNS (&(to_client->write_buf),
+"4 month old factories: ", about_client->building_factory_4, "\n");
 
     /* TODO: write information about buy_raw and sell_prod requests */
 }
@@ -703,13 +607,13 @@ void do_cmd_status (server_info *sinfo, client_info *client,
     } else {
         pointed_client = get_client_by_nick (sinfo->first_client, nick);
         if (pointed_client == NULL) {
-            write (client->fd, msg_client_not_found,
-                sizeof (msg_client_not_found) - 1);
+            ADD_S (&(client->write_buf),
+"Client with same username not found, try \"status --all\".\n");
             return;
         }
     }
 
-    write_common_information (client, sinfo);
+    write_common_information (sinfo, client);
 
     if (write_info_for_all_clients) {
         for (cur_c = sinfo->first_client;
@@ -730,23 +634,22 @@ void do_cmd_build (client_info *client, int count)
     /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
-    write (client->fd, msg_request_stored,
-        sizeof (msg_request_stored) - 1);
+    ADD_S (&(client->write_buf), msg_request_stored);
 }
 
 void do_cmd_prod (client_info *client, int count)
 {
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
-        write (client->fd, msg_too_few_factories,
-            sizeof (msg_too_few_factories) - 1);
+        ADD_S (&(client->write_buf),
+"You have too few factories. Request rejected.\n\
+See information by \"status\" command.\n");
         return;
     }
 
     client->make_prod_count = count;
 
-    write (client->fd, msg_request_stored,
-        sizeof (msg_request_stored) - 1);
+    ADD_S (&(client->write_buf), msg_request_stored);
 }
 
 void do_cmd_buy (server_info *sinfo, client_info *client,
@@ -755,22 +658,19 @@ void do_cmd_buy (server_info *sinfo, client_info *client,
     request *req;
 
     if (count > get_market_raw_count (sinfo)) {
-        write (client->fd, msg_count_out_of_range,
-            sizeof (msg_count_out_of_range) - 1);
+        ADD_S (&(client->write_buf), msg_count_out_of_range);
         return;
     }
 
     if (cost < min_raw_price[sinfo->level]) {
-        write (client->fd, msg_cost_out_of_range,
-            sizeof (msg_cost_out_of_range) - 1);
+        ADD_S (&(client->write_buf), msg_cost_out_of_range);
         return;
     }
 
     req = new_request (client, count);
     add_buy_raw_request (sinfo, cost, req);
 
-    write (client->fd, msg_request_stored,
-        sizeof (msg_request_stored) - 1);
+    ADD_S (&(client->write_buf), msg_request_stored);
 }
 
 void do_cmd_sell (server_info *sinfo, client_info *client,
@@ -779,31 +679,30 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
     request *req;
 
     if (count > get_market_prod_count (sinfo)) {
-        write (client->fd, msg_count_out_of_range,
-            sizeof (msg_count_out_of_range) - 1);
+        ADD_S (&(client->write_buf), msg_count_out_of_range);
         return;
     }
 
     if (count > client->prod_count) {
-        write (client->fd, msg_have_not_prod,
-            sizeof (msg_have_not_prod) - 1);
+        ADD_S (&(client->write_buf),
+"Your have not so much productions. Request rejected.\n\
+See information by \"status your_username\" command.\n");
         return;
     }
 
     if (cost > max_prod_price[sinfo->level]) {
-        write (client->fd, msg_cost_out_of_range,
-            sizeof (msg_cost_out_of_range) - 1);
+        ADD_S (&(client->write_buf), msg_cost_out_of_range);
         return;
     }
 
     req = new_request (client, count);
     add_sell_prod_request (sinfo, cost, req);
 
-    write (client->fd, msg_request_stored,
-        sizeof (msg_request_stored) - 1);
+    ADD_S (&(client->write_buf), msg_request_stored);
 }
 
-void write_not_completed_step_clients (int write_fd, server_info *sinfo)
+void write_not_completed_step_clients (server_info *sinfo,
+    client_info *to_client)
 {
     client_info *cur_c;
     int first_nick = 1;
@@ -816,19 +715,17 @@ void write_not_completed_step_clients (int write_fd, server_info *sinfo)
             continue;
 
         if (first_nick) {
-            write (write_fd, msg_expected_clients,
-                sizeof (msg_expected_clients) - 1);
+            ADD_S (&(to_client->write_buf), "Expected: ");
         } else {
-            write (write_fd, msg_list_separator,
-                sizeof (msg_list_separator) - 1);
+            ADD_S (&(to_client->write_buf), ", ");
         }
 
-        write (write_fd, cur_c->nick, strlen (cur_c->nick));
+        ADD_S_STRLEN (&(to_client->write_buf), cur_c->nick, 0);
         first_nick = 0;
     }
 
     if (!first_nick)
-        write (write_fd, msg_newline, sizeof (msg_newline) - 1);
+        ADD_S (&(to_client->write_buf), "\n");
 }
 
 void do_cmd_turn (server_info *sinfo, client_info *client)
@@ -837,14 +734,14 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
     int all_compl;
 
     if (sinfo->state == G_ST_WAIT_CLIENTS) {
-        write (client->fd, msg_wait_clients,
-            sizeof (msg_wait_clients) - 1);
+        ADD_S (&(client->write_buf),
+"Server wait for full count of clients. Please wait.\n");
         return;
     }
 
     if (client->step_completed) {
-        write (client->fd, msg_step_already_completed,
-            sizeof (msg_step_already_completed) - 1);
+        ADD_S (&(client->write_buf),
+"This month already completed, wait for other clients.\n");
         return;
     }
 
@@ -863,19 +760,15 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
             continue;
         }
 
-        write (cur_c->fd, msg_async_client,
-            sizeof (msg_async_client) - 1);
-        write (cur_c->fd, client->nick,
-            strlen (client->nick));
-        write (cur_c->fd, msg_complete_step,
-            sizeof (msg_complete_step) - 1);
+        ADD_S (&(cur_c->write_buf), "Client ");
+        ADD_S_STRLEN (&(cur_c->write_buf), client->nick, 0);
+        ADD_S (&(cur_c->write_buf), " completed this month.\n");
         /* TODO: make it more optimal. */
-        write_not_completed_step_clients (cur_c->fd, sinfo);
+        write_not_completed_step_clients (sinfo, cur_c);
     }
 
-    write (client->fd, msg_step_completed,
-        sizeof (msg_step_completed) - 1);
-    write_not_completed_step_clients (client->fd, sinfo);
+    ADD_S (&(client->write_buf), "This month completed.\n");
+    write_not_completed_step_clients (sinfo, client);
 
     if (all_compl) {
         game_process_next_step (sinfo);
@@ -884,15 +777,17 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
 
 void do_cmd_wrong (client_info *client)
 {
-    /* Write string without '\0'. */
-    write (client->fd, msg_cmd_wrong, sizeof (msg_cmd_wrong) - 1);
+    ADD_S (&(client->write_buf),
+"Wrong command or argument(s). See \"help\"\n\
+for information about available commands.\n");
 }
 
 /* Returns:
  * 0, if command forbidden in current server state.
  * Also, write reason of rejection to the client.
  * 1, otherwise (command allowed). */
-int allow_command (server_info *sinfo, int write_fd, command *cmd)
+int allow_command (server_info *sinfo,
+    client_info *to_client, command *cmd)
 {
     switch (cmd->type) {
     case CMD_EMPTY:
@@ -914,8 +809,8 @@ int allow_command (server_info *sinfo, int write_fd, command *cmd)
         if (sinfo->state == G_ST_IN_GAME) {
             return 1;
         } else {
-            write (write_fd, msg_not_in_game,
-                sizeof (msg_not_in_game) - 1);
+            ADD_S (&(to_client->write_buf),
+"This command is forbidden before start the game.\n");
             return 0;
         }
 
@@ -934,7 +829,7 @@ int allow_command (server_info *sinfo, int write_fd, command *cmd)
 int execute_cmd (server_info *sinfo,
     client_info *client, command *cmd)
 {
-    if (! allow_command (sinfo, client->fd, cmd)) {
+    if (! allow_command (sinfo, client, cmd)) {
         return 1;
     }
 
@@ -1020,8 +915,7 @@ int game_process_new_client (server_info *sinfo,
     client_info *cur_c;
 
     if (sinfo->state != G_ST_WAIT_CLIENTS) {
-        write (new_client->fd, msg_disconnect,
-            sizeof (msg_disconnect) - 1);
+        ADD_S (&(new_client->write_buf), "Server full.\n");
         client_disconnect (sinfo, new_client, 0, 1);
         return 1;
     }
@@ -1034,12 +928,14 @@ int game_process_new_client (server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        write (cur_c->fd, msg_new_client, sizeof (msg_new_client) - 1);
-        write (cur_c->fd, new_client->nick, strlen (new_client->nick));
-        write (cur_c->fd, msg_newline, sizeof (msg_newline) - 1);
+        ADD_S (&(cur_c->write_buf), /* TODO: maybe remove \n? */
+"Connected new client.\n\
+Username:  ");
+        ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick, 0);
+        ADD_S (&(cur_c->write_buf), "\n");
 
-        write (cur_c->fd, msg_cl_count_2, sizeof (msg_cl_count_2) - 1);
-        write_number (cur_c->fd, sinfo->clients_count, 1);
+        ADD_SNS (&(cur_c->write_buf),
+"Connected: ", sinfo->clients_count, "\n");
     }
 
     if (sinfo->clients_count == sinfo->expected_clients) {
@@ -1050,8 +946,7 @@ int game_process_new_client (server_info *sinfo,
             cur_c != NULL;
             cur_c = cur_c->next)
         {
-            write (cur_c->fd, msg_game_ready,
-                sizeof (msg_game_ready) - 1);
+            ADD_S (&(cur_c->write_buf), "Game ready!\n");
         }
     }
 
@@ -1072,8 +967,7 @@ void process_client_bankrupt (server_info *sinfo, client_info *client)
      * "help" and "status" commands. */
     msg_client_disconnected_to_all (sinfo, client,
         MSG_DISC_BANKRUPTING);
-    write (client->fd, msg_bankrupt,
-        sizeof (msg_bankrupt) - 1);
+    ADD_S (&(client->write_buf), "You are bankrupt!\n");
     unregister_client (sinfo, client);
     client_disconnect (sinfo, client, 1, 1);
     free (client);
@@ -1252,8 +1146,8 @@ void game_process_next_step (server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        write (cur_c->fd, msg_all_cl_step_completed,
-            sizeof (msg_all_cl_step_completed) - 1);
+        ADD_S (&(cur_c->write_buf),
+"Yeah! All players completed this month!\n");
     }
 
     buy_raw_auction (sinfo, market_raw_count);
