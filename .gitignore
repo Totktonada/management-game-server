@@ -3,3 +3,4 @@
 *.o
 management-game-server
 deps.mk
+valgrind.log
