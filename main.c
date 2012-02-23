@@ -36,8 +36,6 @@ void notify_all_clients_about_disconnect (const server_info *sinfo,
 {
     client_info *cur_c;
 
-    notify_client_about_disconnect_reason (client);
-
     if (client->reason == REASON_SERVER_FULL)
         return;
 
@@ -200,8 +198,8 @@ void try_to_unregister_client (server_info *sinfo, client_info *client)
     }
 }
 
-void write_buffers_all_clients (server_info *sinfo,
-    client_info *client)
+/* TODO: maybe add prompt to end? */
+void add_async_prefixes (server_info *sinfo, client_info *client)
 {
     client_info *cur_c;
 
@@ -224,6 +222,25 @@ void write_buffers_all_clients (server_info *sinfo,
                 sizeof (sinfo->time_buf));
             ADD_PREFIX_STRLEN (&(cur_c->write_buf), sinfo->time_buf);
         }
+    }
+}
+
+/* TODO: use select */
+void write_buffers_all_clients (server_info *sinfo)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+#if 0
+        /* TODO: Necessary? */
+        if (! cur_c->connected)
+            continue;
+#endif
+        if (is_msg_buffer_empty (&(cur_c->write_buf)))
+            continue;
 
         write_msg_buffer (&(cur_c->write_buf), cur_c->fd);
     }
@@ -235,9 +252,10 @@ void try_to_disconnect (server_info *sinfo, client_info *client)
     if (! client->to_disconnect)
         return;
 
+    notify_client_about_disconnect_reason (client);
     notify_all_clients_about_disconnect (sinfo, client);
+    add_async_prefixes (sinfo, client);
     write_msg_buffer (&(client->write_buf), client->fd);
-    write_buffers_all_clients (sinfo, client);
 
     try_to_unregister_client (sinfo, client);
 
@@ -280,6 +298,8 @@ void process_new_client (server_info *sinfo, int listening_socket)
         return;
     }
 
+    add_async_prefixes (sinfo, new_client);
+
     if (sinfo->first_client == NULL) {
         sinfo->last_client = sinfo->first_client = new_client;
     } else {
@@ -317,10 +337,8 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #endif
         destroy_str = execute_cmd (sinfo, client, cmd);
         destroy_cmd (cmd, destroy_str);
+        add_async_prefixes (sinfo, client);
         print_prompt (sinfo, client);
-
-        /* TODO: use select */
-        write_buffers_all_clients (sinfo, client);
     } while (1);
 }
 
@@ -437,6 +455,7 @@ int main (int argc, char **argv, char **envp)
         }
 
         read_ready_data (&sinfo, &ready_fds);
+        write_buffers_all_clients (&sinfo);
     } while (1);
 
     return 0;

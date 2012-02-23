@@ -926,14 +926,14 @@ int game_process_new_client (server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        ADD_S (&(cur_c->write_buf), /* TODO: maybe remove \n? */
-"Connected new client.\n\
-Username:  ");
+        ADD_S (&(cur_c->write_buf),
+            "Connected new client. Username: ");
         ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick);
         ADD_S (&(cur_c->write_buf), "\n");
 
         ADD_SNS (&(cur_c->write_buf),
-"Connected: ", sinfo->clients_count, "\n");
+            "Total connected clients: ",
+            sinfo->clients_count, "\n");
     }
 
     if (sinfo->clients_count == sinfo->expected_clients) {
@@ -944,6 +944,7 @@ Username:  ");
             cur_c != NULL;
             cur_c = cur_c->next)
         {
+            /* TODO: maybe send "Game ready!" to new client? */
             ADD_S (&(cur_c->write_buf), "Game ready!\n");
         }
     }
