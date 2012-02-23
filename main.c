@@ -1,45 +1,14 @@
 #include "main.h"
 
-/* Static data */
-/* =========== */
-
-const char msg_prompt_part1[] = "\n";
-const char msg_prompt_part2[] = " $ ";
-
-const char msg_disconnecting[] = "\
-Disconnecting...\n";
-
-const char msg_protocol_parse_error[] = "\
-Protocol parse error.\n";
-
-const char msg_client[] = "\
-*** Client ";
-const char msg_disconnected[] = "\
- disconnected.\nReason: ";
-
-const char msg_disc_by_client[] = "\
-connection closed by client.\n";
-
-const char msg_disc_protocol_parse_error[] = "\
-protocol parse error.\n";
-
-const char msg_disc_bankrupting[] = "\
-bankrupting.\n";
-
-/* =========== */
-
 void print_prompt (client_info *client)
 {
-    write (client->fd, msg_prompt_part1,
-        sizeof (msg_prompt_part1) - 1);
-    write (client->fd, client->nick,
-        strlen (client->nick));
-    write (client->fd, msg_prompt_part2,
-        sizeof (msg_prompt_part2) - 1);
+    ADD_S (&(client->write_buf), "\n");
+    ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
+    ADD_S (&(client->write_buf), " $ ");
 }
 
 void msg_client_disconnected_to_all (const server_info *sinfo,
-    const client_info *client, disconnect_reasons reason)
+    client_info *client, disconnect_reasons reason)
 {
     client_info *cur_c;
 
@@ -50,25 +19,22 @@ void msg_client_disconnected_to_all (const server_info *sinfo,
         if (cur_c == client)
             continue;
 
-        write (cur_c->fd, msg_client,
-            sizeof (msg_client) - 1);
-        write (cur_c->fd, client->nick,
-            strlen (client->nick));
-        write (cur_c->fd, msg_disconnected,
-            sizeof (msg_disconnected) - 1);
+        ADD_S (&(client->write_buf), "Client ");
+        ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
+        ADD_S (&(client->write_buf), " disconnected.\nReason: ");
 
         switch (reason) {
         case MSG_DISC_BY_CLIENT:
-            write (cur_c->fd, msg_disc_by_client,
-                sizeof (msg_disc_by_client) - 1);
+            ADD_S (&(client->write_buf),
+                "connection closed by client.\n");
             break;
         case MSG_DISC_PROTOCOL_PARSE_ERROR:
-            write (cur_c->fd, msg_disc_protocol_parse_error,
-                sizeof (msg_disc_protocol_parse_error) - 1);
+            ADD_S (&(client->write_buf),
+                "protocol parse error.\n");
             break;
         case MSG_DISC_BANKRUPTING:
-            write (cur_c->fd, msg_disc_bankrupting,
-                sizeof (msg_disc_bankrupting) - 1);
+            ADD_S (&(client->write_buf),
+                "bankrupting.\n");
             break;
         }
     }
@@ -193,8 +159,7 @@ void client_disconnect (server_info *sinfo, client_info *client,
     int client_in_server_info_list, int currently_connected)
 {
     if (currently_connected) {
-        write (client->fd, msg_disconnecting,
-            sizeof (msg_disconnecting) - 1);
+        ADD_S (&(client->write_buf), "Disconnecting...\n");
     }
 
     if (client_in_server_info_list) {
@@ -287,8 +252,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
             msg_client_disconnected_to_all (sinfo, client,
                 MSG_DISC_PROTOCOL_PARSE_ERROR);
-            write (client->fd, msg_protocol_parse_error,
-                sizeof (msg_protocol_parse_error) - 1);
+            ADD_S (&(client->write_buf), "Protocol parse error.\n");
             unregister_client (sinfo, client);
             client_disconnect (sinfo, client, 1, 1);
             free (client);

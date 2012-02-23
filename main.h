@@ -136,7 +136,7 @@ void client_disconnect (server_info *sinfo,
 
 void msg_client_disconnected_to_all (
     const server_info *sinfo,
-    const client_info *client,
+    client_info *client,
     disconnect_reasons reason);
 
 #include "parameters.h"
