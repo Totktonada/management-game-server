@@ -465,18 +465,18 @@ void do_cmd_nick (server_info *sinfo, client_info *client, char *nick)
                 continue;
 
             ADD_S (&(cur_c->write_buf), "Username change: ");
-            ADD_S_STRLEN (&(cur_c->write_buf), client->nick, 1);
+            ADD_S_STRLEN_MAKE_COPY (&(cur_c->write_buf), client->nick);
             ADD_S (&(cur_c->write_buf), " -> ");
-            ADD_S_STRLEN (&(cur_c->write_buf), nick, 0);
+            ADD_S_STRLEN (&(cur_c->write_buf), nick);
             ADD_S (&(cur_c->write_buf), "\n");
         }
 
-        /* client->nick will be freed in msg_buffer. */
+        free (client->nick);
         client->nick = nick;
     }
 
     ADD_S (&(client->write_buf), "Your username: ");
-    ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
+    ADD_S_STRLEN (&(client->write_buf), client->nick);
     ADD_S (&(client->write_buf), "\n");
 }
 
@@ -542,7 +542,7 @@ void write_client_information (client_info *to_client,
 
     ADD_S (&(to_client->write_buf),
 "Username:        ");
-    ADD_S_STRLEN (&(to_client->write_buf), about_client->nick, 0);
+    ADD_S_STRLEN (&(to_client->write_buf), about_client->nick);
     ADD_S (&(to_client->write_buf), "\n");
 
     ADD_SNS (&(to_client->write_buf),
@@ -720,7 +720,7 @@ void write_not_completed_step_clients (server_info *sinfo,
             ADD_S (&(to_client->write_buf), ", ");
         }
 
-        ADD_S_STRLEN (&(to_client->write_buf), cur_c->nick, 0);
+        ADD_S_STRLEN (&(to_client->write_buf), cur_c->nick);
         first_nick = 0;
     }
 
@@ -761,7 +761,7 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
         }
 
         ADD_S (&(cur_c->write_buf), "Client ");
-        ADD_S_STRLEN (&(cur_c->write_buf), client->nick, 0);
+        ADD_S_STRLEN (&(cur_c->write_buf), client->nick);
         ADD_S (&(cur_c->write_buf), " completed this month.\n");
         /* TODO: make it more optimal. */
         write_not_completed_step_clients (sinfo, cur_c);
@@ -915,8 +915,6 @@ int game_process_new_client (server_info *sinfo,
     client_info *cur_c;
 
     if (sinfo->state != G_ST_WAIT_CLIENTS) {
-        ADD_S (&(new_client->write_buf), "Server full.\n");
-        client_disconnect (sinfo, new_client, 0, 1);
         return 1;
     }
 
@@ -931,7 +929,7 @@ int game_process_new_client (server_info *sinfo,
         ADD_S (&(cur_c->write_buf), /* TODO: maybe remove \n? */
 "Connected new client.\n\
 Username:  ");
-        ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick, 0);
+        ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick);
         ADD_S (&(cur_c->write_buf), "\n");
 
         ADD_SNS (&(cur_c->write_buf),
@@ -959,18 +957,6 @@ void after_step_expenses (client_info *client)
     client->money -= RAW_EXPENSES * client->raw_count;
     client->money -= PROD_EXPENSES * client->prod_count;
     client->money -= FACTORY_EXPENSES * client->factory_count;
-}
-
-void process_client_bankrupt (server_info *sinfo, client_info *client)
-{
-    /* TODO: maybe, do not disconnect client and permit only
-     * "help" and "status" commands. */
-    msg_client_disconnected_to_all (sinfo, client,
-        MSG_DISC_BANKRUPTING);
-    ADD_S (&(client->write_buf), "You are bankrupt!\n");
-    unregister_client (sinfo, client);
-    client_disconnect (sinfo, client, 1, 1);
-    free (client);
 }
 
 /* Frees all requests in group, group and returns
@@ -1162,7 +1148,9 @@ void game_process_next_step (server_info *sinfo)
         after_step_expenses (cur_c);
 
         if (cur_c->money < 0) {
-            process_client_bankrupt (sinfo, cur_c);
+            /* TODO: maybe, do not disconnect client and permit only
+             * "help" and "status" commands. */
+            mark_client_to_disconnect (cur_c, REASON_BANKRUPTING);
         }
 
         cur_c->step_completed = 0;

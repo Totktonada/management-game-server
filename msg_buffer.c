@@ -16,13 +16,22 @@ int is_msg_buffer_empty (msg_buffer *buf)
     return (buf->common_length == 0);
 }
 
-void mark_last_block_for_destroy (msg_buffer *buf)
+void replace_last_block_with_copy (msg_buffer *buf)
 {
+    char *new_str;
+
     if (buf->last_block == NULL
         || buf->last_block->str == NULL)
+    {
         return;
+    }
 
-    buf->last_block->destroy_str = 1;
+    new_str = (char *) malloc (sizeof (char) *
+        buf->last_block->length);
+    memcpy (new_str, buf->last_block->str, buf->last_block->length);
+    buf->last_block->str = new_str;
+
+    buf->last_block->is_copy = 1;
 }
 
 msg_block *new_str_msg_block (const char *str, int str_length)
@@ -33,7 +42,7 @@ msg_block *new_str_msg_block (const char *str, int str_length)
     new_msg_block->str = str;
     new_msg_block->number = 0;
     new_msg_block->length = str_length;
-    new_msg_block->destroy_str = 0;
+    new_msg_block->is_copy = 0;
     return new_msg_block;
 }
 
@@ -46,7 +55,7 @@ msg_block *new_number_msg_block (const int number, int *str_length)
     new_msg_block->number = number;
     new_msg_block->length = *str_length =
         log10i (number) + 1;
-    new_msg_block->destroy_str = 0;
+    new_msg_block->is_copy = 0;
     return new_msg_block;
 }
 
@@ -126,8 +135,8 @@ char *msg_buffer_to_string (msg_buffer *buf)
         } else { /* String block */
             memcpy (cur_sym_to, current->str, current->length);
             /* Yes, we absolutelly sure, that current->str
-             * is not const, if this marked for destroy. */
-            if (current->destroy_str)
+             * is not const, if this marked as copy. */
+            if (current->is_copy)
                 free ((char *) current->str);
         }
 

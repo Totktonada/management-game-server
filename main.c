@@ -3,14 +3,42 @@
 void print_prompt (client_info *client)
 {
     ADD_S (&(client->write_buf), "\n");
-    ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
+    ADD_S_STRLEN (&(client->write_buf), client->nick);
     ADD_S (&(client->write_buf), " $ ");
 }
 
-void msg_client_disconnected_to_all (const server_info *sinfo,
-    client_info *client, disconnect_reasons reason)
+void notify_client_about_disconnect_reason (client_info *client)
+{
+    if (! client->connected)
+        return;
+
+    ADD_S (&(client->write_buf), "Disconnecting... Reason: ");
+
+    switch (client->reason) {
+    case REASON_SERVER_FULL:
+        ADD_S (&(client->write_buf), "server full.\n");
+        break;
+    case REASON_BY_CLIENT:
+        /* Not possible. */
+        break;
+    case REASON_PROTOCOL_PARSE_ERROR:
+        ADD_S (&(client->write_buf), "protocol parse error.\n");
+        break;
+    case REASON_BANKRUPTING:
+        ADD_S (&(client->write_buf), "you are bankrupt!\n");
+        break;
+    }
+}
+
+void notify_all_clients_about_disconnect (const server_info *sinfo,
+    client_info *client)
 {
     client_info *cur_c;
+
+    notify_client_about_disconnect_reason (client);
+
+    if (client->reason == REASON_SERVER_FULL)
+        return;
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
@@ -19,21 +47,24 @@ void msg_client_disconnected_to_all (const server_info *sinfo,
         if (cur_c == client)
             continue;
 
-        ADD_S (&(client->write_buf), "Client ");
-        ADD_S_STRLEN (&(client->write_buf), client->nick, 0);
-        ADD_S (&(client->write_buf), " disconnected.\nReason: ");
+        ADD_S (&(cur_c->write_buf), "Client ");
+        ADD_S_STRLEN (&(cur_c->write_buf), client->nick);
+        ADD_S (&(cur_c->write_buf), " disconnected.\nReason: ");
 
-        switch (reason) {
-        case MSG_DISC_BY_CLIENT:
-            ADD_S (&(client->write_buf),
+        switch (client->reason) {
+        case REASON_SERVER_FULL:
+            /* Not possible. */
+            break;
+        case REASON_BY_CLIENT:
+            ADD_S (&(cur_c->write_buf),
                 "connection closed by client.\n");
             break;
-        case MSG_DISC_PROTOCOL_PARSE_ERROR:
-            ADD_S (&(client->write_buf),
+        case REASON_PROTOCOL_PARSE_ERROR:
+            ADD_S (&(cur_c->write_buf),
                 "protocol parse error.\n");
             break;
-        case MSG_DISC_BANKRUPTING:
-            ADD_S (&(client->write_buf),
+        case REASON_BANKRUPTING:
+            ADD_S (&(cur_c->write_buf),
                 "bankrupting.\n");
             break;
         }
@@ -106,6 +137,8 @@ client_info *new_client_info (int client_socket)
         malloc (sizeof (client_info));
     client->next = NULL;
     client->fd = client_socket;
+    client->connected = 0;
+    client->to_disconnect = 0;
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info (&(client->pinfo));
@@ -126,8 +159,15 @@ void init_server_info (server_info *sinfo)
     new_game_data (sinfo);
 }
 
-/* Remove client from our structures. */
-void unregister_client (server_info *sinfo, client_info *client)
+void mark_client_to_disconnect (client_info *client,
+    disconnect_reasons reason)
+{
+    client->to_disconnect = 1;
+    client->reason = reason;
+}
+
+/* Remove client from our structures (if it contain this client). */
+void try_to_unregister_client (server_info *sinfo, client_info *client)
 {
     client_info *prev_c = NULL;
     client_info *cur_c = sinfo->first_client;
@@ -137,6 +177,11 @@ void unregister_client (server_info *sinfo, client_info *client)
         next_c = cur_c->next;
 
         if (cur_c == client) {
+            FD_CLR (client->fd, &(sinfo->read_fds));
+            if (sinfo->max_fd == client->fd) {
+                update_max_fd (sinfo);
+            }
+
             if (cur_c == sinfo->first_client)
                 sinfo->first_client = next_c;
             else
@@ -154,20 +199,43 @@ void unregister_client (server_info *sinfo, client_info *client)
     }
 }
 
-/* Disconnect client. */
-void client_disconnect (server_info *sinfo, client_info *client,
-    int client_in_server_info_list, int currently_connected)
+void write_buffers_all_clients (server_info *sinfo,
+    client_info *client)
 {
-    if (currently_connected) {
-        ADD_S (&(client->write_buf), "Disconnecting...\n");
-    }
+    client_info *cur_c;
 
-    if (client_in_server_info_list) {
-        FD_CLR (client->fd, &(sinfo->read_fds));
-        if (sinfo->max_fd == client->fd) {
-            update_max_fd (sinfo);
-        }
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+#if 0
+        /* TODO: Necessary? */
+        if (! cur_c->connected)
+            continue;
+#endif
+        if (is_msg_buffer_empty (&(cur_c->write_buf)))
+            continue;
+
+        /* Add prefix for asynchronous messages. */
+        /* TODO: "\n*** [timespamp] ***\n" */
+        if (cur_c != client)
+            ADD_PREFIX (&(cur_c->write_buf), "*** ");
+
+        write_msg_buffer (&(cur_c->write_buf), cur_c->fd);
     }
+}
+
+/* Disconnect client. */
+void try_to_disconnect (server_info *sinfo, client_info *client)
+{
+    if (! client->to_disconnect)
+        return;
+
+    notify_all_clients_about_disconnect (sinfo, client);
+    write_msg_buffer (&(client->write_buf), client->fd);
+    write_buffers_all_clients (sinfo, client);
+
+    try_to_unregister_client (sinfo, client);
 
     if (SHUTDOWN_ERROR (
         shutdown (client->fd, SHUT_RDWR)))
@@ -175,10 +243,15 @@ void client_disconnect (server_info *sinfo, client_info *client,
         perror ("shutdown ()");
         exit (ES_SYSCALL_FAILED);
     }
+
+    client->connected = 0;
+
     if (CLOSE_ERROR (close (client->fd))) {
         perror ("close ()");
         exit (ES_SYSCALL_FAILED);
     }
+
+    free (client);
 }
 
 /* Add new client to our structures.
@@ -195,9 +268,11 @@ void process_new_client (server_info *sinfo, int listening_socket)
     }
 
     new_client = new_client_info (client_socket);
+    new_client->connected = 1;
 
     if (game_process_new_client (sinfo, new_client)) {
-        free (new_client);
+        mark_client_to_disconnect (new_client, REASON_SERVER_FULL);
+        try_to_disconnect (sinfo, new_client);
         return;
     }
 
@@ -215,27 +290,6 @@ void process_new_client (server_info *sinfo, int listening_socket)
     print_prompt (new_client);
 }
 
-void write_buffers_all_clients (server_info *sinfo,
-    client_info *client)
-{
-    client_info *cur_c;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        if (is_msg_buffer_empty (&(cur_c->write_buf)))
-            continue;
-
-        /* Add prefix for asynchronous messages. */
-        /* TODO: "\n*** [timespamp] ***\n" */
-        if (cur_c != client)
-            ADD_PREFIX (&(cur_c->write_buf), "*** ");
-
-        write_msg_buffer (&(cur_c->write_buf), cur_c->fd);
-    }
-}
-
 void process_readed_data (server_info *sinfo, client_info *client)
 {
     command *cmd;
@@ -250,12 +304,8 @@ void process_readed_data (server_info *sinfo, client_info *client)
         if (cmd == NULL)
             break;
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
-            msg_client_disconnected_to_all (sinfo, client,
-                MSG_DISC_PROTOCOL_PARSE_ERROR);
-            ADD_S (&(client->write_buf), "Protocol parse error.\n");
-            unregister_client (sinfo, client);
-            client_disconnect (sinfo, client, 1, 1);
-            free (client);
+            mark_client_to_disconnect (client,
+                REASON_PROTOCOL_PARSE_ERROR);
             break;
         }
 #ifndef DAEMON
@@ -263,9 +313,10 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #endif
         destroy_str = execute_cmd (sinfo, client, cmd);
         destroy_cmd (cmd, destroy_str);
-         /* TODO: use select */
-        write_buffers_all_clients (sinfo, client);
         print_prompt (client);
+
+        /* TODO: use select */
+        write_buffers_all_clients (sinfo, client);
     } while (1);
 }
 
@@ -289,16 +340,14 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
             perror ("read ()");
             exit (ES_SYSCALL_FAILED);
         } else if (READ_EOF (read_value)) {
-            msg_client_disconnected_to_all (sinfo, cur_c,
-                MSG_DISC_BY_CLIENT);
-            unregister_client (sinfo, cur_c);
-            client_disconnect (sinfo, cur_c, 1, 0);
-            free (cur_c);
+            cur_c->connected = 0;
+            mark_client_to_disconnect (cur_c, REASON_BY_CLIENT);
         } else {
             cur_c->read_available = read_value;
             process_readed_data (sinfo, cur_c);
         }
 
+        try_to_disconnect (sinfo, cur_c);
         cur_c = next_c;
     } /* while */
 }

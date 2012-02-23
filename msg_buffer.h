@@ -13,7 +13,7 @@ typedef struct msg_block {
 	const char *str;
     unsigned int number;
     unsigned int length;
-    int destroy_str;
+    int is_copy;
 } msg_block;
 
 typedef struct msg_buffer {
@@ -24,7 +24,7 @@ typedef struct msg_buffer {
 
 void new_msg_buffer (msg_buffer *buf);
 int is_msg_buffer_empty (msg_buffer *buf);
-void mark_last_block_for_destroy (msg_buffer *buf);
+void replace_last_block_with_copy (msg_buffer *buf);
 void add_prefix_to_msg_buffer (msg_buffer *buf,
     const char *prefix, unsigned int prefix_length);
 void add_str_to_msg_buffer (msg_buffer *buf,
@@ -51,11 +51,15 @@ do { \
     add_str_to_msg_buffer (buf, s1, sizeof (s1) - 1); \
 } while (0)
 
-#define ADD_S_STRLEN(buf, s1, destroy_str) \
+#define ADD_S_STRLEN(buf, s1) \
 do { \
     add_str_to_msg_buffer (buf, s1, strlen (s1)); \
-    if (destroy_str) \
-        mark_last_block_for_destroy (buf); \
+} while (0)
+
+#define ADD_S_STRLEN_MAKE_COPY(buf, s1) \
+do { \
+    add_str_to_msg_buffer (buf, s1, strlen (s1)); \
+    replace_last_block_with_copy (buf); \
 } while (0)
 
 #define ADD_N(buf, n1) \

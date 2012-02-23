@@ -56,10 +56,20 @@ typedef struct request {
 } request;
 */
 
+typedef enum disconnect_reasons {
+    REASON_SERVER_FULL,
+    REASON_BY_CLIENT,
+    REASON_PROTOCOL_PARSE_ERROR,
+    REASON_BANKRUPTING
+} disconnect_reasons;
+
 typedef struct client_info {
     /* Common */
     struct client_info *next;
     int fd;
+    int connected;
+    int to_disconnect;
+    disconnect_reasons reason;
     /* Read */
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
@@ -120,23 +130,7 @@ typedef struct server_info {
     request_group *sell_prod;
 } server_info;
 
-typedef enum disconnect_reasons {
-    MSG_DISC_BY_CLIENT,
-    MSG_DISC_PROTOCOL_PARSE_ERROR,
-    MSG_DISC_BANKRUPTING
-} disconnect_reasons;
-
-void unregister_client (server_info *sinfo,
-    client_info *client);
-
-void client_disconnect (server_info *sinfo,
-    client_info *client,
-    int client_in_server_info_list,
-    int currently_connected);
-
-void msg_client_disconnected_to_all (
-    const server_info *sinfo,
-    client_info *client,
+void mark_client_to_disconnect (client_info *client,
     disconnect_reasons reason);
 
 #include "parameters.h"
