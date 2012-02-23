@@ -1,8 +1,9 @@
 #include "main.h"
 
-void print_prompt (client_info *client)
+void print_prompt (server_info *sinfo, client_info *client)
 {
-    ADD_S (&(client->write_buf), "\n");
+    update_time_buf (sinfo->time_buf, sizeof (sinfo->time_buf));
+    ADD_S_STRLEN (&(client->write_buf), sinfo->time_buf);
     ADD_S_STRLEN (&(client->write_buf), client->nick);
     ADD_S (&(client->write_buf), " $ ");
 }
@@ -217,9 +218,12 @@ void write_buffers_all_clients (server_info *sinfo,
             continue;
 
         /* Add prefix for asynchronous messages. */
-        /* TODO: "\n*** [timespamp] ***\n" */
-        if (cur_c != client)
-            ADD_PREFIX (&(cur_c->write_buf), "*** ");
+        /* TODO: maybe make special mark for async. message? */
+        if (cur_c != client) {
+            update_time_buf (sinfo->time_buf,
+                sizeof (sinfo->time_buf));
+            ADD_PREFIX_STRLEN (&(cur_c->write_buf), sinfo->time_buf);
+        }
 
         write_msg_buffer (&(cur_c->write_buf), cur_c->fd);
     }
@@ -287,7 +291,7 @@ void process_new_client (server_info *sinfo, int listening_socket)
         sinfo->max_fd = client_socket;
     }
 
-    print_prompt (new_client);
+    print_prompt (sinfo, new_client);
 }
 
 void process_readed_data (server_info *sinfo, client_info *client)
@@ -313,7 +317,7 @@ void process_readed_data (server_info *sinfo, client_info *client)
 #endif
         destroy_str = execute_cmd (sinfo, client, cmd);
         destroy_cmd (cmd, destroy_str);
-        print_prompt (client);
+        print_prompt (sinfo, client);
 
         /* TODO: use select */
         write_buffers_all_clients (sinfo, client);

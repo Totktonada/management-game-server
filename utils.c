@@ -70,3 +70,37 @@ unsigned int log10i (unsigned int number)
 
     return i;
 }
+
+/* Get current (local) time and place it to time_buf
+ * in format "\n[%H:%M:%S] ". On fail place "\n" to
+ * strbuf. Real buffer size must be >= 2 (for avoid
+ * segfault). */
+void update_time_buf (char *time_buf, int buf_size)
+{
+    time_t unix_time;
+    struct tm *localtime_var;
+    int ok = 1;
+
+    time (&unix_time);
+    localtime_var = localtime (&unix_time);
+
+    if (LOCALTIME_ERROR (localtime_var)) {
+        perror ("localtime ()");
+        ok = 0;
+    }
+
+    if (ok && STRFTIME_ERROR (strftime (time_buf, buf_size,
+        "\n[%H:%M:%S] ", localtime_var)))
+    {
+#ifndef DAEMON
+        fprintf (stderr, "strftime () failed.\
+See file %s line %d.\n", __FILE__, __LINE__);
+#endif
+        ok = 0;
+    }
+
+    if (!ok) {
+        time_buf[0] = '\n';
+        time_buf[1] = '\0';
+    }
+}

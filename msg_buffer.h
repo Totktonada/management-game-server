@@ -40,10 +40,10 @@ void add_half_to_msg_buffer (msg_buffer *buf,
  * N - number;
  * H - half of number; */
 
-#define ADD_PREFIX(buf, prefix) \
+#define ADD_PREFIX_STRLEN(buf, prefix) \
 do { \
     add_prefix_to_msg_buffer (buf, prefix, \
-        sizeof (prefix) - 1); \
+        strlen (prefix)); \
 } while (0)
 
 #define ADD_S(buf, s1) \
