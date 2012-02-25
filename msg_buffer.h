@@ -87,7 +87,7 @@ do { \
 do { \
     ADD_S (buf, s1); \
     ADD_N (buf, *var_addr); \
-    if (change > 0) { \
+    if (change >= 0) { \
         ADD_S (buf, " + "); \
         ADD_N (buf, change); \
     } else { \
@@ -95,6 +95,28 @@ do { \
         ADD_N (buf, -change); \
     } \
     *var_addr += change; \
+    ADD_S (buf, " = "); \
+    ADD_N (buf, *var_addr); \
+    ADD_S (buf, s2); \
+} while (0)
+
+#define VAR_CHANGE_MULT(buf, s1, var_addr, count, change, s2) \
+do { \
+    ADD_S (buf, s1); \
+    ADD_N (buf, *var_addr); \
+    if (change >= 0) { \
+        ADD_S (buf, " + ("); \
+        ADD_N (buf, count); \
+        ADD_S (buf, " * "); \
+        ADD_N (buf, change); \
+    } else { \
+        ADD_S (buf, " - ("); \
+        ADD_N (buf, count); \
+        ADD_S (buf, " * "); \
+        ADD_N (buf, -change); \
+    } \
+    ADD_S (buf, ")"); \
+    *var_addr += (change * count); \
     ADD_S (buf, " = "); \
     ADD_N (buf, *var_addr); \
     ADD_S (buf, s2); \
