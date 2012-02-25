@@ -6,8 +6,10 @@
 /* Case sensitive. */
 #define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
 
+#if 0 /* Not used. */
 #define MIN(n1, n2) (((n1) <= (n2)) ? (n1) : (n2))
 #define MAX(n1, n2) (((n1) >= (n2)) ? (n1) : (n2))
+#endif
 
 #define LOCALTIME_ERROR(localtime_value) ((localtime_value) == NULL)
 #define STRFTIME_ERROR(strftime_value) ((strftime_value) == 0)

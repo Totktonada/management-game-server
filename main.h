@@ -99,6 +99,11 @@ typedef enum game_state {
     G_ST_IN_GAME
 } game_state;
 
+typedef enum request_type {
+    REQUEST_RAW,
+    REQUEST_PROD
+} request_type;
+
 typedef struct request {
     struct request *next;
     client_info *client;

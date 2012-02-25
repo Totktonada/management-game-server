@@ -1020,20 +1020,42 @@ request *get_request (request_group **group_pointer,
     return req;
 }
 
+void make_auction_request (request_type type, request *req,
+    unsigned int cost)
+{
+    switch (type) {
+    case REQUEST_RAW:
+        VAR_CHANGE (&(req->client->write_buf),
+            "Raw: ", &(req->client->raw_count),
+            req->count, "; ");
+        VAR_CHANGE (&(req->client->write_buf),
+            "Money: ", &(req->client->money),
+            -((int) (req->count * cost)), ".\n");
+        break;
+    case REQUEST_PROD:
+        VAR_CHANGE (&(req->client->write_buf),
+            "Prod: ", &(req->client->prod_count),
+            -((int) req->count), "; ");
+        VAR_CHANGE (&(req->client->write_buf),
+            "Money: ", &(req->client->money),
+            (req->count * cost), ".\n");
+    }
+}
+
 void buy_raw_auction (server_info *sinfo,
     unsigned int market_raw_count)
 {
     request *req;
     request_group *group = sinfo->buy_raw;
-    unsigned int real_buy_raw_count, cost;
+    unsigned int cost;
 
     while (market_raw_count != 0 && group != NULL) {
         req = get_request (&group, &cost);
-
-        real_buy_raw_count = MIN (market_raw_count, req->count);
-        req->client->raw_count += real_buy_raw_count;
-        req->client->money -= (real_buy_raw_count * cost);
-        market_raw_count -= real_buy_raw_count;
+        if (market_raw_count < req->count)
+            req->count = market_raw_count;
+        make_auction_request (REQUEST_RAW, req, cost);
+        market_raw_count -= req->count;
+        free (req);
     }
 
     while (group != NULL) {
@@ -1048,17 +1070,15 @@ void sell_prod_auction (server_info *sinfo,
 {
     request *req;
     request_group *group = sinfo->sell_prod;
-    unsigned int real_sell_prod_count, cost;
+    unsigned int cost;
 
     while (market_prod_count != 0 && group != NULL) {
         req = get_request (&group, &cost);
-
-        real_sell_prod_count = MIN (market_prod_count, req->count);
+        if (market_prod_count < req->count)
+            req->count = market_prod_count;
+        make_auction_request (REQUEST_PROD, req, cost);
+        market_prod_count -= req->count;
         free (req);
-
-        req->client->prod_count -= real_sell_prod_count;
-        req->client->money += (real_sell_prod_count * cost);
-        market_prod_count -= real_sell_prod_count;
     }
 
     while (group != NULL) {

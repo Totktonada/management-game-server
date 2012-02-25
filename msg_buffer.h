@@ -83,6 +83,23 @@ do { \
     add_str_to_msg_buffer (buf, s3, sizeof (s3) - 1); \
 } while (0)
 
+#define VAR_CHANGE(buf, s1, var_addr, change, s2) \
+do { \
+    ADD_S (buf, s1); \
+    ADD_N (buf, *var_addr); \
+    if (change > 0) { \
+        ADD_S (buf, " + "); \
+        ADD_N (buf, change); \
+    } else { \
+        ADD_S (buf, " - "); \
+        ADD_N (buf, -change); \
+    } \
+    *var_addr += change; \
+    ADD_S (buf, " = "); \
+    ADD_N (buf, *var_addr); \
+    ADD_S (buf, s2); \
+} while (0)
+
 /* Similar macro I see in [1]. See "#define write_str".
  * [1] http://code.turnkeylinux.org/busybox/networking/telnet.c */
 
