@@ -72,14 +72,16 @@ unsigned int log10i (unsigned int number)
 }
 
 /* Get current (local) time and place it to time_buf
- * in format "\n[%H:%M:%S] ". On fail place "\n" to
- * strbuf. Real buffer size must be >= 2 (for avoid
- * segfault). */
-void update_time_buf (char *time_buf, int buf_size)
+ * in format "\n[%H:%M:%S] " or "(\n(%H:%M:%S) ".
+ * On fail place "\n" to strbuf. Real buffer size
+ * must be >= 2 (for avoid segfault). */
+void update_time_buf (char *time_buf, int buf_size,
+    prefix_type type)
 {
     time_t unix_time;
     struct tm *localtime_var;
     int ok = 1;
+    int strftime_value;
 
     time (&unix_time);
     localtime_var = localtime (&unix_time);
@@ -89,8 +91,18 @@ void update_time_buf (char *time_buf, int buf_size)
         ok = 0;
     }
 
-    if (ok && STRFTIME_ERROR (strftime (time_buf, buf_size,
-        "\n[%H:%M:%S] ", localtime_var)))
+    if (ok && (type == PREFIX_PROMPT)) {
+        strftime_value = strftime (time_buf, buf_size,
+            "\n[%H:%M:%S] ", localtime_var);
+    } else if (ok && (type == PREFIX_ASYNC_MSG)) {
+        strftime_value = strftime (time_buf, buf_size,
+            "\n<%H:%M:%S> ", localtime_var);
+    } else {
+        /* Not possible. */
+        ok = 0;
+    }
+
+    if (ok && STRFTIME_ERROR (strftime_value))
     {
 #ifndef DAEMON
         fprintf (stderr, "strftime () failed.\

@@ -2,8 +2,9 @@
 
 void print_prompt (server_info *sinfo, client_info *client)
 {
-    update_time_buf (sinfo->time_buf, sizeof (sinfo->time_buf));
-    ADD_S_STRLEN (&(client->write_buf), sinfo->time_buf);
+    update_time_buf (sinfo->prefix_prompt,
+        sizeof (sinfo->prefix_prompt), PREFIX_PROMPT);
+    ADD_S_STRLEN (&(client->write_buf), sinfo->prefix_prompt);
     ADD_S_STRLEN (&(client->write_buf), client->nick);
     ADD_S (&(client->write_buf), " $ ");
 }
@@ -216,11 +217,11 @@ void add_async_prefixes (server_info *sinfo, client_info *client)
             continue;
 
         /* Add prefix for asynchronous messages. */
-        /* TODO: maybe make special mark for async. message? */
         if (cur_c != client) {
-            update_time_buf (sinfo->time_buf,
-                sizeof (sinfo->time_buf));
-            ADD_PREFIX_STRLEN (&(cur_c->write_buf), sinfo->time_buf);
+            update_time_buf (sinfo->prefix_async_msg,
+                sizeof (sinfo->prefix_async_msg), PREFIX_ASYNC_MSG);
+            ADD_PREFIX_STRLEN (&(cur_c->write_buf),
+                sinfo->prefix_async_msg);
         }
     }
 }

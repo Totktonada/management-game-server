@@ -126,11 +126,13 @@ typedef struct server_info {
     client_info *first_client;
     client_info *last_client;
     int expected_clients;
-    /* Time data */
-    /* Format: "\n[%H:%M:%S] ".
+    /* Prompt and time data.
+     * Format 1: "\n[%H:%M:%S] "
+     * Format 2: "\n(%H:%M:%S) "
      * See update_time_buf () in utils.c
      * for more information. */
-    char time_buf[16];
+    char prefix_prompt[16];
+    char prefix_async_msg[16];
     /* Game data */
     unsigned int clients_count;
     game_state state;
