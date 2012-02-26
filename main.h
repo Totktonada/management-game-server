@@ -45,17 +45,6 @@
 #define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 #define SETSID_ERROR(setsid_value) ((setsid_value) == -1)
 
-/* Is nessassary separate structure?
-typedef struct request {
-    unsigned int make_prod_count;
-    unsigned int buy_raw_count;
-    unsigned int buy_raw_cost;
-    unsigned int sell_prod_count;
-    unsigned int sell_prod_cost;
-    unsigned int make_factory_count;
-} request;
-*/
-
 typedef enum disconnect_reasons {
     REASON_SERVER_FULL,
     REASON_BY_CLIENT,
