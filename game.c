@@ -582,25 +582,39 @@ void write_client_information (client_info *client,
     ADD_S (write_buf,
 "\n--- Requests info ---\n");
 
-    ADD_SNS (write_buf,
-"Build factories:       ", client->build_factory_count, "\n");
+    ADD_S (write_buf,
+"Requested raw:      ");
+    ADD_N (write_buf, client->buy_raw_count);
+    ADD_S (write_buf, " / ");
+    ADD_N (write_buf, client->buy_raw_cost);
+    ADD_S (write_buf, "    (count / cost of one)\n");
+
+    ADD_S (write_buf,
+"Offered production: ");
+    ADD_N (write_buf, client->sell_prod_count);
+    ADD_S (write_buf, " / ");
+    ADD_N (write_buf, client->sell_prod_cost);
+    ADD_S (write_buf, "    (count / cost of one)\n");
 
     ADD_SNS (write_buf,
-"Make productions:      ", client->make_prod_count, "\n");
+"Productions:        ", client->make_prod_count, "\n");
 
     ADD_SNS (write_buf,
-"1 month old factories: ", client->building_factory_1, "\n");
+"Factories:          ", client->build_factory_count, "\n");
 
-    ADD_SNS (write_buf,
-"2 month old factories: ", client->building_factory_2, "\n");
+    ADD_S (write_buf,
+"\n--- Building factories ---\n");
 
-    ADD_SNS (write_buf,
-"3 month old factories: ", client->building_factory_3, "\n");
-
-    ADD_SNS (write_buf,
-"4 month old factories: ", client->building_factory_4, "\n");
-
-    /* TODO: write information about buy_raw and sell_prod requests */
+    ADD_S (write_buf,
+"1/2/3/4 month old:  ");
+    ADD_N (write_buf, client->building_factory_1);
+    ADD_S (write_buf, " / ");
+    ADD_N (write_buf, client->building_factory_2);
+    ADD_S (write_buf, " / ");
+    ADD_N (write_buf, client->building_factory_3);
+    ADD_S (write_buf, " / ");
+    ADD_N (write_buf, client->building_factory_4);
+    ADD_S (write_buf, "\n");
 }
 
 void write_all_clients_information (server_info *sinfo,
@@ -695,6 +709,9 @@ void do_cmd_buy (server_info *sinfo, client_info *client,
     req = new_request (client, count);
     add_buy_raw_request (sinfo, cost, req);
 
+    client->buy_raw_count = count;
+    client->buy_raw_cost = cost;
+
     ADD_S (&(client->write_buf), msg_request_stored);
 }
 
@@ -722,6 +739,9 @@ See information by \"status your_username\" command.\n");
 
     req = new_request (client, count);
     add_sell_prod_request (sinfo, cost, req);
+
+    client->sell_prod_count = count;
+    client->sell_prod_cost = cost;
 
     ADD_S (&(client->write_buf), msg_request_stored);
 }
@@ -982,19 +1002,19 @@ void after_step_expenses (client_info *client)
     if (client->raw_count > 0) {
         VAR_CHANGE_MULT (&(client->write_buf),
             "[Raw expenses] Money: ", &(client->money),
-            client->raw_count, -((int) RAW_EXPENSES), ".\n");
+            client->raw_count, -((int) RAW_EXPENSES), "\n");
     }
 
     if (client->prod_count > 0) {
         VAR_CHANGE_MULT (&(client->write_buf),
             "[Prod. expenses] Money: ", &(client->money),
-            client->prod_count, -((int) PROD_EXPENSES), ".\n");
+            client->prod_count, -((int) PROD_EXPENSES), "\n");
     }
 
     if (client->factory_count > 0) {
         VAR_CHANGE_MULT (&(client->write_buf),
             "[Factory expenses] Money: ", &(client->money),
-            client->factory_count, -((int) FACTORY_EXPENSES), ".\n");
+            client->factory_count, -((int) FACTORY_EXPENSES), "\n");
     }
 }
 
@@ -1065,18 +1085,18 @@ void make_auction_request (request_type type, request *req,
     case REQUEST_RAW:
         VAR_CHANGE (&(req->client->write_buf),
             "[Raw auction] Raw: ", &(req->client->raw_count),
-            req->count, ".\n");
+            req->count, "\n");
         VAR_CHANGE_MULT (&(req->client->write_buf),
             "[Raw auction] Money: ", &(req->client->money),
-            req->count, -((int) cost), ".\n");
+            req->count, -((int) cost), "\n");
         break;
     case REQUEST_PROD:
         VAR_CHANGE (&(req->client->write_buf),
             "[Prod. auction] Prod.: ", &(req->client->prod_count),
-            -((int) req->count), ".\n");
+            -((int) req->count), "\n");
         VAR_CHANGE_MULT (&(req->client->write_buf),
             "[Prod. auction] Money: ", &(req->client->money),
-            req->count, cost, ".\n");
+            req->count, cost, "\n");
     }
 }
 
@@ -1112,13 +1132,13 @@ void grant_make_prod_request (client_info *client)
     /* Make production. */
     VAR_CHANGE (&(client->write_buf),
         "[Make production] Raw: ", &(client->raw_count),
-        -((int) client->make_prod_count), ".\n");
+        -((int) client->make_prod_count), "\n");
     VAR_CHANGE (&(client->write_buf),
         "[Make production] Prod.: ", &(client->prod_count),
-        client->make_prod_count, ".\n");
+        client->make_prod_count, "\n");
     VAR_CHANGE_MULT (&(client->write_buf),
         "[Make production] Money: ", &(client->money),
-        client->make_prod_count, -((int) MAKE_PROD_COST), ".\n");
+        client->make_prod_count, -((int) MAKE_PROD_COST), "\n");
     client->make_prod_count = 0;
 }
 
@@ -1128,7 +1148,7 @@ void grant_build_factories_request (client_info *client)
     if (client->building_factory_4 > 0) {
         VAR_CHANGE (&(client->write_buf),
             "[Building] Factories: ", &(client->factory_count),
-            client->building_factory_4, ".\n");
+            client->building_factory_4, "\n");
     }
 
     client->building_factory_4 = client->building_factory_3;
@@ -1141,14 +1161,14 @@ void grant_build_factories_request (client_info *client)
         VAR_CHANGE_MULT (&(client->write_buf),
             "[Building, payment 1] Money: ", &(client->money),
             client->building_factory_1,
-            -((int) MAKE_FACTORY_FIRST_HALF), ".\n");
+            -((int) MAKE_FACTORY_FIRST_HALF), "\n");
     }
 
     if (client->building_factory_4 > 0) {
         VAR_CHANGE_MULT (&(client->write_buf),
             "[Building, payment 2] Money: ", &(client->money),
             client->building_factory_4,
-            -((int) MAKE_FACTORY_SECOND_HALF), ".\n");
+            -((int) MAKE_FACTORY_SECOND_HALF), "\n");
     }
 }
 
@@ -1167,6 +1187,14 @@ void change_level (server_info *sinfo)
             return;
         }
     }
+}
+
+void flush_auction_auxiliary_info (client_info *client)
+{
+    client->buy_raw_count = 0;
+    client->buy_raw_cost = 0;
+    client->sell_prod_count = 0;
+    client->sell_prod_cost = 0;
 }
 
 void game_process_next_step (server_info *sinfo)
@@ -1190,6 +1218,7 @@ void game_process_next_step (server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        flush_auction_auxiliary_info (cur_c);
         grant_make_prod_request (cur_c);
         grant_build_factories_request (cur_c);
         after_step_expenses (cur_c);

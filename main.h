@@ -81,6 +81,11 @@ typedef struct client_info {
     unsigned int building_factory_2;
     unsigned int building_factory_3;
     unsigned int building_factory_4;
+    /* For write_client_information () */
+    unsigned int buy_raw_count;
+    unsigned int buy_raw_cost;
+    unsigned int sell_prod_count;
+    unsigned int sell_prod_cost;
 } client_info;
 
 typedef enum game_state {
