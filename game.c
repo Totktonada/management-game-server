@@ -392,7 +392,6 @@ void do_cmd_help (client_info *client, char *cmd_name)
         ADD_S (&(client->write_buf), msg_help_cmd_build);
         break;
     case CMD_PROD:
-        /* TODO: information about cost of one production. */
         ADD_S (&(client->write_buf), msg_help_cmd_prod);
         break;
     case CMD_BUY:
