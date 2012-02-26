@@ -953,10 +953,23 @@ int game_process_new_client (server_info *sinfo,
 
 void after_step_expenses (client_info *client)
 {
-    /* TODO: write messages about money change. */
-    client->money -= RAW_EXPENSES * client->raw_count;
-    client->money -= PROD_EXPENSES * client->prod_count;
-    client->money -= FACTORY_EXPENSES * client->factory_count;
+    if (client->raw_count > 0) {
+        VAR_CHANGE_MULT (&(client->write_buf),
+            "[Raw expenses] Money: ", &(client->money),
+            client->raw_count, -((int) RAW_EXPENSES), ".\n");
+    }
+
+    if (client->prod_count > 0) {
+        VAR_CHANGE_MULT (&(client->write_buf),
+            "[Prod. expenses] Money: ", &(client->money),
+            client->prod_count, -((int) PROD_EXPENSES), ".\n");
+    }
+
+    if (client->factory_count > 0) {
+        VAR_CHANGE_MULT (&(client->write_buf),
+            "[Factory expenses] Money: ", &(client->money),
+            client->factory_count, -((int) FACTORY_EXPENSES), ".\n");
+    }
 }
 
 /* Frees all requests in group, group and returns
