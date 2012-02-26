@@ -116,8 +116,8 @@ typedef struct server_info {
     client_info *last_client;
     int expected_clients;
     /* Prompt and time data.
-     * Format 1: "\n[%H:%M:%S] "
-     * Format 2: "\n(%H:%M:%S) "
+     * Prompt format:     "\n[%H:%M:%S] "
+     * Async. msg format: "\n<%H:%M:%S> "
      * See update_time_buf () in utils.c
      * for more information. */
     char prefix_prompt[16];
