@@ -15,7 +15,7 @@ typedef enum type_of_cmd {
         --all | -a | --market | -m |
         --players | -p | --server | -s] */
     CMD_BUILD,  /* build count */
-    CMD_PROD,   /* prod count */
+    CMD_MAKE,   /* make count */
     CMD_BUY,    /* buy count cost */
     CMD_SELL,   /* sell count cost */
     CMD_TURN,   /* turn */

@@ -37,7 +37,7 @@ Available commands:\n\
 * nick [string]\n\
 * status [username | parameter]\n\
 * build count\n\
-* prod count\n\
+* make count\n\
 * buy count cost\n\
 * sell count cost\n\
 * turn\n\
@@ -108,8 +108,8 @@ One factory cost:\n\
 After second payment, count factories is ready to work.\n";
 
 /* TODO: use MAKE_PROD_COST macro. */
-const char msg_help_cmd_prod[] = "\
-prod count\n\
+const char msg_help_cmd_make[] = "\
+make count\n\
 \n\
 Make production on your factories.\n\
 One factory can make one production in one step.\n\
@@ -358,8 +358,8 @@ void print_cmd (command *cmd)
     case CMD_BUILD:
         printf ("[CMD_BUILD]\n");
         break;
-    case CMD_PROD:
-        printf ("[CMD_PROD]\n");
+    case CMD_MAKE:
+        printf ("[CMD_MAKE]\n");
         break;
     case CMD_BUY:
         printf ("[CMD_BUY]\n");
@@ -404,8 +404,8 @@ void do_cmd_help (client_info *client, char *cmd_name)
     case CMD_BUILD:
         ADD_S (&(client->write_buf), msg_help_cmd_build);
         break;
-    case CMD_PROD:
-        ADD_S (&(client->write_buf), msg_help_cmd_prod);
+    case CMD_MAKE:
+        ADD_S (&(client->write_buf), msg_help_cmd_make);
         break;
     case CMD_BUY:
         ADD_S (&(client->write_buf), msg_help_cmd_buy);
@@ -662,7 +662,7 @@ void do_cmd_build (client_info *client, int count)
     ADD_S (&(client->write_buf), msg_request_stored);
 }
 
-void do_cmd_prod (client_info *client, int count)
+void do_cmd_make (client_info *client, int count)
 {
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
@@ -827,7 +827,7 @@ int allow_command (server_info *sinfo,
 #endif
 
     case CMD_BUILD:
-    case CMD_PROD:
+    case CMD_MAKE:
     case CMD_BUY:
     case CMD_SELL:
     case CMD_TURN:
@@ -874,8 +874,8 @@ int execute_cmd (server_info *sinfo,
     case CMD_BUILD:
         do_cmd_build (client, cmd->value.number);
         break;
-    case CMD_PROD:
-        do_cmd_prod (client, cmd->value.number);
+    case CMD_MAKE:
+        do_cmd_make (client, cmd->value.number);
         break;
     case CMD_BUY:
         do_cmd_buy (sinfo, client,

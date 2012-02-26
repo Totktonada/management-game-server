@@ -84,7 +84,7 @@ command *p_st_process_arg1 (parser_info *pinfo)
 
     /* Commands with one numerical argument. */
     case CMD_BUILD:
-    case CMD_PROD:
+    case CMD_MAKE:
         pinfo->state = P_ST_EXPECT_ONE_NUMBER;
         break;
 
@@ -115,7 +115,7 @@ command *p_st_process_arg2 (parser_info *pinfo)
     case CMD_STATUS:
     /* Commands with one numerical argument. */
     case CMD_BUILD:
-    case CMD_PROD:
+    case CMD_MAKE:
         pinfo->state = P_ST_EXPECT_EOLN;
         break;
 
@@ -226,7 +226,7 @@ command *p_st_expect_one_number (parser_info *pinfo)
     case LEX_NUMBER:
         switch (pinfo->tmp_cmd.type) {
         case CMD_BUILD:
-        case CMD_PROD:
+        case CMD_MAKE:
             pinfo->tmp_cmd.value = pinfo->cur_lex->value;
             break;
         case CMD_BUY:
