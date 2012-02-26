@@ -1086,25 +1086,32 @@ void grant_make_prod_request (client_info *client)
 
 void grant_build_factories_request (client_info *client)
 {
-    /* TODO: messages for clients. */
-
     /* Build factories. */
-#if 0
-    client->money -=
-        client->build_factory_count * MAKE_FACTORY_FIRST_HALF;
-#endif
+    if (client->building_factory_4 > 0) {
+        VAR_CHANGE (&(client->write_buf),
+            "[Building] Factories: ", &(client->factory_count),
+            client->building_factory_4, ".\n");
+    }
 
-    client->factory_count += client->building_factory_4;
     client->building_factory_4 = client->building_factory_3;
     client->building_factory_3 = client->building_factory_2;
     client->building_factory_2 = client->building_factory_1;
     client->building_factory_1 = client->build_factory_count;
     client->build_factory_count = 0;
 
-    client->money -=
-        client->building_factory_1 * MAKE_FACTORY_FIRST_HALF;
-    client->money -=
-        client->building_factory_4 * MAKE_FACTORY_SECOND_HALF;
+    if (client->building_factory_1 > 0) {
+        VAR_CHANGE_MULT (&(client->write_buf),
+            "[Building, payment 1] Money: ", &(client->money),
+            client->building_factory_1,
+            -((int) MAKE_FACTORY_FIRST_HALF), ".\n");
+    }
+
+    if (client->building_factory_4 > 0) {
+        VAR_CHANGE_MULT (&(client->write_buf),
+            "[Building, payment 2] Money: ", &(client->money),
+            client->building_factory_4,
+            -((int) MAKE_FACTORY_SECOND_HALF), ".\n");
+    }
 }
 
 /* Change sinfo->level depending on level_change_probability . */
