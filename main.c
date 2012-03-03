@@ -26,9 +26,6 @@ void notify_client_about_disconnect_reason (client_info *client)
     case REASON_PROTOCOL_PARSE_ERROR:
         ADD_S (&(client->write_buf), "protocol parse error.\n");
         break;
-    case REASON_BANKRUPTING:
-        ADD_S (&(client->write_buf), "you are bankrupt!\n");
-        break;
     }
 }
 
@@ -62,10 +59,6 @@ void notify_all_clients_about_disconnect (const server_info *sinfo,
         case REASON_PROTOCOL_PARSE_ERROR:
             ADD_S (&(cur_c->write_buf),
                 "protocol parse error.\n");
-            break;
-        case REASON_BANKRUPTING:
-            ADD_S (&(cur_c->write_buf),
-                "bankrupting.\n");
             break;
         }
     }
@@ -139,6 +132,8 @@ client_info *new_client_info (int client_socket)
     client->fd = client_socket;
     client->connected = 0;
     client->to_disconnect = 0;
+    client->in_round = 0;
+    client->want_to_next_round = 0;
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info (&(client->pinfo));
@@ -156,7 +151,9 @@ void init_server_info (server_info *sinfo)
     FD_SET (sinfo->listening_socket, &(sinfo->read_fds));
     sinfo->first_client = NULL;
     update_max_fd (sinfo);
+    sinfo->clients_count = 0;
     new_game_data (sinfo);
+    process_end_round (sinfo);
 }
 
 void mark_client_to_disconnect (client_info *client,
@@ -277,6 +274,62 @@ void try_to_disconnect (server_info *sinfo, client_info *client)
     free (client);
 }
 
+char *first_vacant_nick (client_info *first_client)
+{
+    /* Why 12? See comment to number_to_str ().
+     * First position reserved for 'p' symbol. */
+    char *buf = (char *) malloc (12 * sizeof (char));
+    client_info *cur_c;
+    int nick_number = 0;
+    int nick_found;
+
+    *buf = 'p';
+
+    do {
+        nick_found = 0;
+        cur_c = first_client;
+        number_to_str (buf + 1, nick_number);
+
+        while (cur_c != NULL && !nick_found) {
+            if (cur_c->nick == NULL) {
+                nick_found = 0;
+            } else {
+                nick_found = STR_EQUAL (buf,
+                    cur_c->nick);
+            }
+            cur_c = cur_c->next;
+        }
+
+        ++nick_number;
+    } while (nick_found);
+
+    return buf;
+}
+
+void notify_client_connected (server_info *sinfo,
+    client_info *new_client)
+{
+    client_info *cur_c;
+
+    /* Messages for all clients. */
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->in_round)
+            continue;
+
+        ADD_S (&(cur_c->write_buf),
+            "Connected new client. Username: ");
+        ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick);
+        ADD_S (&(cur_c->write_buf), "\n");
+
+        ADD_SNS (&(cur_c->write_buf),
+            "Total connected clients: ",
+            sinfo->clients_count, "\n");
+    }
+}
+
 /* Add new client to our structures.
  * Exit on failure. */
 void process_new_client (server_info *sinfo, int listening_socket)
@@ -293,12 +346,15 @@ void process_new_client (server_info *sinfo, int listening_socket)
     new_client = new_client_info (client_socket);
     new_client->connected = 1;
 
-    if (game_process_new_client (sinfo, new_client)) {
+    if (sinfo->clients_count == sinfo->max_clients) {
         mark_client_to_disconnect (new_client, REASON_SERVER_FULL);
         try_to_disconnect (sinfo, new_client);
         return;
     }
 
+    ++(sinfo->clients_count);
+    new_client->nick = first_vacant_nick (sinfo->first_client);
+    notify_client_connected (sinfo, new_client);
     add_async_prefixes (sinfo, new_client);
 
     if (sinfo->first_client == NULL) {
@@ -313,6 +369,14 @@ void process_new_client (server_info *sinfo, int listening_socket)
     }
 
     print_prompt (sinfo, new_client);
+}
+
+void process_end_round (server_info *sinfo)
+{
+    sinfo->players_count = 0;
+    sinfo->in_round = 0;
+    sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
+    sinfo->warnings_count = 0;
 }
 
 void process_readed_data (server_info *sinfo, client_info *client)
@@ -375,6 +439,63 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
     } /* while */
 }
 
+void start_new_round (server_info *sinfo)
+{
+    client_info *cur_c;
+
+    sinfo->warnings_count = 0;
+    sinfo->players_count = 0;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->want_to_next_round) {
+            cur_c->in_round = 1;
+            cur_c->want_to_next_round = 0;
+            ++(sinfo->players_count);
+            ADD_S (&(cur_c->write_buf),
+                "Game ready! You are player.\n");
+            /* TODO: write count and list of players. */
+        } else {
+            ADD_S (&(cur_c->write_buf), "Game ready!\n");
+        }
+    }
+
+    sinfo->in_round = 1;
+}
+
+void warn_all (server_info *sinfo)
+{
+    client_info *cur_c;
+    unsigned int remain_time =
+        (WARNINGS_BEFORE_ROUND + 1 - sinfo->warnings_count)
+        * TIME_BETWEEN_TIME_EVENTS;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        ADD_S (&(cur_c->write_buf), "To next round remain: ");
+        ADD_N (&(cur_c->write_buf), remain_time);
+        ADD_S (&(cur_c->write_buf), " (sec)\n");
+    }
+}
+
+void process_time_events (server_info *sinfo)
+{
+    if (sinfo->warnings_count < WARNINGS_BEFORE_ROUND) {
+        ++(sinfo->warnings_count);
+        sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
+        warn_all (sinfo);
+    } else {
+        /* (sinfo->warnings_count == (WARNINGS_BEFORE_ROUND + 1) */
+        start_new_round (sinfo);
+    }
+
+    add_async_prefixes (sinfo, NULL);
+}
+
 #ifdef DAEMON_ALT
 void daemon_alt ()
 {
@@ -421,6 +542,8 @@ int main (int argc, char **argv, char **envp)
     server_info sinfo;
     int select_value;
     fd_set ready_fds;
+    struct timeval tv;
+    time_t delta_time;
 
     sinfo.listening_port = DEFAULT_LISTENING_PORT;
     process_cmd_line_parameters (&sinfo, argv + 1);
@@ -439,16 +562,31 @@ int main (int argc, char **argv, char **envp)
     do {
         ready_fds = sinfo.read_fds;
 
-        /* Wait new client or data from exist clients */
-        select_value = select (sinfo.max_fd + 1, &ready_fds,
-            NULL, NULL, 0);
+        /* Wait new client, data from exist clients or
+         * expire of time period. */
+        if (sinfo.in_round) {
+            select_value = select (sinfo.max_fd + 1, &ready_fds,
+                NULL, NULL, NULL);
+        } else {
+            tv.tv_sec = sinfo.time_to_next_event;
+            tv.tv_usec = 0;
+            time (&delta_time);
+            select_value = select (sinfo.max_fd + 1, &ready_fds,
+                NULL, NULL, &tv);
+            delta_time = time (NULL) - delta_time;
+        }
+
         if (SELECT_ERROR (select_value)) {
             perror ("select ()");
             exit (ES_SYSCALL_FAILED);
         }
 
         if (SELECT_TIMEOUT (select_value)) {
-            /* TODO */;
+            process_time_events (&sinfo);
+        } else {
+            sinfo.time_to_next_event -= delta_time;
+            if (sinfo.time_to_next_event < 0)
+                sinfo.time_to_next_event = 0;
         }
 
         if (FD_ISSET (sinfo.listening_socket, &ready_fds)) {

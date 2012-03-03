@@ -174,8 +174,6 @@ See information by \"status\" command.\n";
 
 void new_game_data (server_info *sinfo)
 {
-    sinfo->clients_count = 0;
-    sinfo->state = G_ST_WAIT_CLIENTS;
     sinfo->step = 0;
     sinfo->level = 2;
     sinfo->buy_raw = NULL;
@@ -318,25 +316,25 @@ void add_sell_prod_request (server_info *sinfo,
 }
 
 /* Calculate raw count for current market level.
- * This function used sinfo->clients_count for calculation,
+ * This function used sinfo->players_count for calculation,
  * therefore it returns correct value for current step
  * only before or after clients to go bankrupt.
  * Rounding to lower number. */
 unsigned int get_market_raw_count (server_info *sinfo)
 {
     return (unsigned int) ((raw_count_per_player[sinfo->level]
-        * sinfo->clients_count) / 2);
+        * sinfo->players_count) / 2);
 }
 
 /* Calculate production need count for current market level.
- * This function used sinfo->clients_count for calculation,
+ * This function used sinfo->players_count for calculation,
  * therefore it returns correct value for current step
  * only before or after clients to go bankrupt.
  * Rounding to lower number. */
 unsigned int get_market_prod_count (server_info *sinfo)
 {
     return (unsigned int) ((prod_count_per_player[sinfo->level]
-        * sinfo->clients_count) / 2);
+        * sinfo->players_count) / 2);
 }
 
 #ifndef DAEMON
@@ -498,7 +496,10 @@ void write_server_information (server_info *sinfo, msg_buffer *write_buf)
 "\n==== Server info ====\n");
 
     ADD_SNS (write_buf,
-"Connected: ", sinfo->clients_count, "\n");
+"Connected (clients): ", sinfo->clients_count, "\n");
+
+    ADD_SNS (write_buf,
+"In round (players):  ", sinfo->players_count, "\n");
 }
 
 void write_market_information (server_info *sinfo, msg_buffer *write_buf)
@@ -547,9 +548,16 @@ prod_count_per_player[sinfo->level],
     }
 }
 
-void write_client_information (client_info *client,
+void write_player_information (client_info *client,
     msg_buffer *write_buf, int write_requests)
 {
+    if (! client->in_round) {
+        ADD_S (write_buf, "Client ");
+        ADD_S_STRLEN (write_buf, client->nick);
+        ADD_S (write_buf, " is not player.");
+        return;
+    }
+
     ADD_S (write_buf, "\n==== ");
     ADD_S_STRLEN (write_buf, client->nick);
     ADD_S (write_buf, " ====\n");
@@ -626,7 +634,10 @@ void write_all_clients_information (server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        write_client_information (cur_c,
+        if (! cur_c->in_round)
+            continue;
+
+        write_player_information (cur_c,
             &(to_client->write_buf), to_client == cur_c);
     }
 }
@@ -636,8 +647,10 @@ void do_cmd_status (server_info *sinfo, client_info *client,
 {
     client_info *pointed_client = NULL;
 
-    if (nick == NULL) {
-        write_client_information (client, &(client->write_buf), 1);
+    if (nick == NULL && client->in_round) {
+        write_player_information (client, &(client->write_buf), 1);
+    } else if (nick == NULL && ! client->in_round) {
+        ADD_S (&(client->write_buf), "You are not player.\n");
     } else if (STR_EQUAL_CASE_INS (nick, "--all")
         || STR_EQUAL_CASE_INS (nick, "-a"))
     {
@@ -661,10 +674,10 @@ void do_cmd_status (server_info *sinfo, client_info *client,
         if (pointed_client == NULL) {
             ADD_S (&(client->write_buf),
 "Client with same username not found, try \"status --players\".\n");
-            return;
+        } else {
+            write_player_information (pointed_client,
+                &(client->write_buf), client == pointed_client);
         }
-        write_client_information (pointed_client,
-            &(client->write_buf), client == pointed_client);
     }
 }
 
@@ -778,12 +791,6 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
     client_info *cur_c;
     int all_compl;
 
-    if (sinfo->state == G_ST_WAIT_CLIENTS) {
-        ADD_S (&(client->write_buf),
-"Server wait for full count of clients. Please wait.\n");
-        return;
-    }
-
     if (client->step_completed) {
         ADD_S (&(client->write_buf),
 "This month already completed, wait for other clients.\n");
@@ -828,11 +835,11 @@ for information about available commands.\n");
 }
 
 /* Returns:
- * 0, if command forbidden in current server state.
- * Also, write reason of rejection to the client.
+ * 0, if command forbidden in dependent with current
+ * value of client->in_round. Also, write reason of
+ * rejection to the client.
  * 1, otherwise (command allowed). */
-int allow_command (server_info *sinfo,
-    msg_buffer *write_buf, command *cmd)
+int allow_command (client_info *client, command *cmd)
 {
     switch (cmd->type) {
     case CMD_EMPTY:
@@ -841,9 +848,9 @@ int allow_command (server_info *sinfo,
     case CMD_NICK:
         return 1;
 #if 0
-    /* Last client can not change nick. */
     case CMD_NICK:
-        return (sinfo->state == G_ST_WAIT_CLIENTS);
+        /* Players can not change nick. */
+        return (! sinfo->in_round);
 #endif
 
     case CMD_BUILD:
@@ -851,10 +858,11 @@ int allow_command (server_info *sinfo,
     case CMD_BUY:
     case CMD_SELL:
     case CMD_TURN:
-        if (sinfo->state == G_ST_IN_GAME) {
+        if (client->in_round) {
+            /* sinfo->in round is 1. */
             return 1;
         } else {
-            ADD_S (write_buf,
+            ADD_S (&(client->write_buf),
 "This command is forbidden before start the game.\n");
             return 0;
         }
@@ -874,7 +882,7 @@ int allow_command (server_info *sinfo,
 int execute_cmd (server_info *sinfo,
     client_info *client, command *cmd)
 {
-    if (! allow_command (sinfo, &(client->write_buf), cmd)) {
+    if (! allow_command (client, cmd)) {
         return 1;
     }
 
@@ -917,84 +925,6 @@ int execute_cmd (server_info *sinfo,
     }
 
     return (cmd->type != CMD_NICK);
-}
-
-char *first_vacant_nick (client_info *first_client)
-{
-    /* Why 12? See comment to number_to_str ().
-     * First position reserved for 'p' symbol. */
-    char *buf = (char *) malloc (12 * sizeof (char));
-    client_info *cur_c;
-    int nick_number = 0;
-    int nick_found;
-
-    *buf = 'p';
-
-    do {
-        nick_found = 0;
-        cur_c = first_client;
-        number_to_str (buf + 1, nick_number);
-
-        while (cur_c != NULL && !nick_found) {
-            if (cur_c->nick == NULL) {
-                nick_found = 0;
-            } else {
-                nick_found = STR_EQUAL (buf,
-                    cur_c->nick);
-            }
-            cur_c = cur_c->next;
-        }
-
-        ++nick_number;
-    } while (nick_found);
-
-    return buf;
-}
-
-/* Returns:
- * 0, if client connected
- * 1, if client count full. */
-int game_process_new_client (server_info *sinfo,
-    client_info *new_client)
-{
-    client_info *cur_c;
-
-    if (sinfo->state != G_ST_WAIT_CLIENTS) {
-        return 1;
-    }
-
-    ++(sinfo->clients_count);
-    new_client->nick = first_vacant_nick (sinfo->first_client);
-
-    /* Messages for all clients. */
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        ADD_S (&(cur_c->write_buf),
-            "Connected new client. Username: ");
-        ADD_S_STRLEN (&(cur_c->write_buf), new_client->nick);
-        ADD_S (&(cur_c->write_buf), "\n");
-
-        ADD_SNS (&(cur_c->write_buf),
-            "Total connected clients: ",
-            sinfo->clients_count, "\n");
-    }
-
-    if (sinfo->clients_count == sinfo->expected_clients) {
-        sinfo->state = G_ST_IN_GAME;
-
-        /* Messages for all clients. */
-        for (cur_c = sinfo->first_client;
-            cur_c != NULL;
-            cur_c = cur_c->next)
-        {
-            /* TODO: maybe send "Game ready!" to new client? */
-            ADD_S (&(cur_c->write_buf), "Game ready!\n");
-        }
-    }
-
-    return 0;
 }
 
 void after_step_expenses (client_info *client)
@@ -1197,6 +1127,75 @@ void flush_auction_auxiliary_info (client_info *client)
     client->sell_prod_cost = 0;
 }
 
+void bankrupt_notify_all_clients (server_info *sinfo,
+    client_info *client)
+{
+    client_info *cur_c;
+
+    /* Messages for all clients. */
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c == client) {
+            ADD_S (&(cur_c->write_buf), "You are bankrupt!\n");
+        } else {
+            ADD_S (&(cur_c->write_buf), "Player ");
+            ADD_S_STRLEN (&(cur_c->write_buf), client->nick);
+            ADD_S (&(cur_c->write_buf), " is bankrupt.\n");
+        }
+    }
+}
+
+void write_winners (server_info *sinfo, msg_buffer *write_buf)
+{
+    client_info *cur_c;
+    int first_nick = 1;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->in_round)
+            continue;
+
+        if (first_nick) {
+            ADD_S (write_buf, "Winners: ");
+        } else {
+            ADD_S (write_buf, ", ");
+        }
+
+        ADD_S_STRLEN (write_buf, cur_c->nick);
+        first_nick = 0;
+    }
+
+    if (!first_nick)
+        ADD_S (write_buf, "\n");
+}
+
+void try_to_process_win (server_info *sinfo)
+{
+    client_info *cur_c;
+
+    if (sinfo->players_count >= 2) {
+        for (cur_c = sinfo->first_client;
+            cur_c != NULL;
+            cur_c = cur_c->next)
+        {
+            cur_c->in_round = 0;
+        }
+    }
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        write_winners (sinfo, &(cur_c->write_buf));
+    }
+
+    process_end_round (sinfo);
+}
+
 void game_process_next_step (server_info *sinfo)
 {
     client_info *cur_c;
@@ -1224,9 +1223,8 @@ void game_process_next_step (server_info *sinfo)
         after_step_expenses (cur_c);
 
         if (cur_c->money < 0) {
-            /* TODO: maybe, do not disconnect client and permit only
-             * "help" and "status" commands. */
-            mark_client_to_disconnect (cur_c, REASON_BANKRUPTING);
+            bankrupt_notify_all_clients (sinfo, cur_c);
+            --(sinfo->players_count);
         }
 
         cur_c->step_completed = 0;
@@ -1234,4 +1232,5 @@ void game_process_next_step (server_info *sinfo)
 
     change_level (sinfo);
     ++(sinfo->step);
+    try_to_process_win (sinfo);
 }

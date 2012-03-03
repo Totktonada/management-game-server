@@ -15,7 +15,7 @@
 typedef enum parameters_parser_state {
     PARAM_P_ST_START,
     PARAM_P_ST_PORT,
-    PARAM_P_ST_CLIENTS,
+    PARAM_P_ST_MAX,
     PARAM_P_ST_ERROR
 } parameters_parser_state;
 

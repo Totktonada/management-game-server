@@ -16,9 +16,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 
 #define DEFAULT_LISTENING_PORT 37187
 #define READ_BUFFER_SIZE 1024
+#define TIME_BETWEEN_TIME_EVENTS 10
+#define WARNINGS_BEFORE_ROUND 5
 
 #include "parser.h"
 #include "utils.h"
@@ -48,8 +51,7 @@
 typedef enum disconnect_reasons {
     REASON_SERVER_FULL,
     REASON_BY_CLIENT,
-    REASON_PROTOCOL_PARSE_ERROR,
-    REASON_BANKRUPTING
+    REASON_PROTOCOL_PARSE_ERROR
 } disconnect_reasons;
 
 typedef struct client_info {
@@ -59,6 +61,8 @@ typedef struct client_info {
     int connected;
     int to_disconnect;
     disconnect_reasons reason;
+    int in_round;
+    int want_to_next_round;
     /* Read */
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
@@ -88,11 +92,6 @@ typedef struct client_info {
     unsigned int sell_prod_cost;
 } client_info;
 
-typedef enum game_state {
-    G_ST_WAIT_CLIENTS,
-    G_ST_IN_GAME
-} game_state;
-
 typedef enum request_type {
     REQUEST_RAW,
     REQUEST_PROD
@@ -119,7 +118,10 @@ typedef struct server_info {
     int max_fd;
     client_info *first_client;
     client_info *last_client;
-    int expected_clients;
+    int clients_count;
+    int max_clients; /* -1 is without limitation */
+    time_t time_to_next_event;
+    unsigned int warnings_count;
     /* Prompt and time data.
      * Prompt format:     "\n[%H:%M:%S] "
      * Async. msg format: "\n<%H:%M:%S> "
@@ -128,8 +130,8 @@ typedef struct server_info {
     char prefix_prompt[16];
     char prefix_async_msg[16];
     /* Game data */
-    unsigned int clients_count;
-    game_state state;
+    int players_count;
+    unsigned int in_round:1;
     unsigned int step;
     unsigned int level; /* [0-4] */
     request_group *buy_raw;
@@ -138,6 +140,7 @@ typedef struct server_info {
 
 void mark_client_to_disconnect (client_info *client,
     disconnect_reasons reason);
+void process_end_round (server_info *sinfo);
 
 #include "parameters.h"
 #include "game.h"
