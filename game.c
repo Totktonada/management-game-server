@@ -754,7 +754,7 @@ void do_cmd_sell (server_info *sinfo, client_info *client,
     if (count > client->prod_count) {
         ADD_S (&(client->write_buf),
 "Your have not so much productions. Request rejected.\n\
-See information by \"status your_username\" command.\n");
+See information by \"status\" command.\n");
         return;
     }
 
@@ -806,7 +806,7 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
 
     if (client->step_completed) {
         ADD_S (&(client->write_buf),
-"This month already completed, wait for other clients.\n");
+"This month already completed, wait for other players.\n");
         return;
     }
 
