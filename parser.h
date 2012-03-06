@@ -19,6 +19,7 @@ typedef enum type_of_cmd {
     CMD_BUY,    /* buy count cost */
     CMD_SELL,   /* sell count cost */
     CMD_TURN,   /* turn */
+    CMD_JOIN,   /* join */
     CMD_WRONG,
     CMD_PROTOCOL_PARSE_ERROR
 } type_of_cmd;

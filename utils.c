@@ -18,6 +18,8 @@ type_of_cmd get_cmd_type (char *str)
         return CMD_SELL;
     } else if (STR_EQUAL_CASE_INS (str, "turn")) {
         return CMD_TURN;
+    } else if (STR_EQUAL_CASE_INS (str, "join")) {
+        return CMD_JOIN;
     } else {
         return CMD_WRONG;
     }

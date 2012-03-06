@@ -163,6 +163,69 @@ void mark_client_to_disconnect (client_info *client,
     client->reason = reason;
 }
 
+void warn_all (server_info *sinfo)
+{
+    client_info *cur_c;
+    unsigned int remain_time =
+        sinfo->backward_warnings_counter * TIME_BETWEEN_TIME_EVENTS;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        ADD_S (&(cur_c->write_buf),
+"Time remaining to the next game round: ");
+        ADD_N (&(cur_c->write_buf), remain_time);
+        ADD_S (&(cur_c->write_buf), " (sec)\n");
+        if (cur_c->want_to_next_round) {
+            ADD_S (&(cur_c->write_buf),
+"Your request to participating in next game round is stored.\n");
+        } else {
+            ADD_S (&(cur_c->write_buf),
+"You *not* send request for participating in this round.\n\
+You can do it by join command (see \"help join\").\n");
+        }
+    }
+
+    --(sinfo->backward_warnings_counter);
+}
+
+void notify_all (server_info *sinfo, const char *msg)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        ADD_S_STRLEN (&(cur_c->write_buf), msg);
+        /* TODO: remove strlen. */
+    }
+}
+
+void try_to_deferred_start_round (server_info *sinfo)
+{
+    if (!sinfo->in_round
+        && (sinfo->time_to_next_event < 0)
+        && (sinfo->clients_count > 1))
+    {
+        sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
+        sinfo->backward_warnings_counter = WARNINGS_BEFORE_ROUND;
+        warn_all (sinfo);
+    }
+}
+
+void try_to_stop_deferred_start_round (server_info *sinfo)
+{
+    if (sinfo->clients_count <= 1) {
+        sinfo->time_to_next_event = -1;
+        sinfo->backward_warnings_counter = 0;
+        notify_all (sinfo,
+"Round can not be started because count of clients\n\
+less then two.\n");
+    }
+}
+
 /* Remove client from our structures (if it contain this client). */
 void try_to_unregister_client (server_info *sinfo, client_info *client)
 {
@@ -187,7 +250,12 @@ void try_to_unregister_client (server_info *sinfo, client_info *client)
             if (cur_c == sinfo->last_client)
                 sinfo->last_client = prev_c;
 
-            --sinfo->clients_count;
+            --(sinfo->clients_count);
+            if (cur_c->in_round) {
+                /* TODO: maybe separate message for players. */
+                --(sinfo->players_count);
+            }
+            try_to_stop_deferred_start_round (sinfo);
             break;
         }
 
@@ -368,6 +436,7 @@ void process_new_client (server_info *sinfo, int listening_socket)
         sinfo->max_fd = client_socket;
     }
 
+    try_to_deferred_start_round (sinfo);
     print_prompt (sinfo, new_client);
 }
 
@@ -375,8 +444,8 @@ void process_end_round (server_info *sinfo)
 {
     sinfo->players_count = 0;
     sinfo->in_round = 0;
-    sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
-    sinfo->warnings_count = 0;
+    sinfo->time_to_next_event = -1;
+    sinfo->backward_warnings_counter = 0;
 }
 
 void process_readed_data (server_info *sinfo, client_info *client)
@@ -439,12 +508,21 @@ void read_ready_data (server_info *sinfo, fd_set *ready_fds)
     } /* while */
 }
 
-void start_new_round (server_info *sinfo)
+void try_to_start_new_round (server_info *sinfo)
 {
     client_info *cur_c;
 
-    sinfo->warnings_count = 0;
-    sinfo->players_count = 0;
+    sinfo->time_to_next_event = -1;
+    sinfo->backward_warnings_counter = 0;
+
+    if (sinfo->players_count <= 1) {
+        notify_all (sinfo,
+"Round can not be started because count of\n\
+clients, which send request for participating\n\
+in game round, less then two.\n");
+        try_to_deferred_start_round (sinfo);
+        return;
+    }
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
@@ -453,44 +531,26 @@ void start_new_round (server_info *sinfo)
         if (cur_c->want_to_next_round) {
             cur_c->in_round = 1;
             cur_c->want_to_next_round = 0;
-            ++(sinfo->players_count);
             ADD_S (&(cur_c->write_buf),
-                "Game ready! You are player.\n");
+"Game ready! You are player of this game round.\n");
             /* TODO: write count and list of players. */
         } else {
-            ADD_S (&(cur_c->write_buf), "Game ready!\n");
+            ADD_S (&(cur_c->write_buf),
+"Game ready! You are *not* player of this game round.\n");
         }
     }
 
     sinfo->in_round = 1;
 }
 
-void warn_all (server_info *sinfo)
-{
-    client_info *cur_c;
-    unsigned int remain_time =
-        (WARNINGS_BEFORE_ROUND + 1 - sinfo->warnings_count)
-        * TIME_BETWEEN_TIME_EVENTS;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        ADD_S (&(cur_c->write_buf), "To next round remain: ");
-        ADD_N (&(cur_c->write_buf), remain_time);
-        ADD_S (&(cur_c->write_buf), " (sec)\n");
-    }
-}
-
 void process_time_events (server_info *sinfo)
 {
-    if (sinfo->warnings_count < WARNINGS_BEFORE_ROUND) {
-        ++(sinfo->warnings_count);
+    if (sinfo->backward_warnings_counter > 0) {
         sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
         warn_all (sinfo);
     } else {
-        /* (sinfo->warnings_count == (WARNINGS_BEFORE_ROUND + 1) */
-        start_new_round (sinfo);
+        /* sinfo->backward_warnings_counter == 0 */
+        try_to_start_new_round (sinfo);
     }
 
     add_async_prefixes (sinfo, NULL);
@@ -564,7 +624,7 @@ int main (int argc, char **argv, char **envp)
 
         /* Wait new client, data from exist clients or
          * expire of time period. */
-        if (sinfo.in_round) {
+        if (sinfo.time_to_next_event < 0) {
             select_value = select (sinfo.max_fd + 1, &ready_fds,
                 NULL, NULL, NULL);
         } else {
@@ -583,7 +643,7 @@ int main (int argc, char **argv, char **envp)
 
         if (SELECT_TIMEOUT (select_value)) {
             process_time_events (&sinfo);
-        } else {
+        } else if (sinfo.time_to_next_event > 0) {
             sinfo.time_to_next_event -= delta_time;
             if (sinfo.time_to_next_event < 0)
                 sinfo.time_to_next_event = 0;

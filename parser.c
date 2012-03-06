@@ -72,6 +72,7 @@ command *p_st_process_arg1 (parser_info *pinfo)
     switch (pinfo->tmp_cmd.type) {
     /* Commands without arguments. */
     case CMD_TURN:
+    case CMD_JOIN:
         pinfo->state = P_ST_EXPECT_EOLN;
         break;
 

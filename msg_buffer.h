@@ -64,7 +64,12 @@ do { \
 
 #define ADD_N(buf, n1) \
 do { \
-    add_number_to_msg_buffer (buf, n1); \
+    if (n1 < 0) { \
+        add_str_to_msg_buffer (buf, "-", 1); \
+        add_number_to_msg_buffer (buf, -n1); \
+    } else { \
+        add_number_to_msg_buffer (buf, n1); \
+    } \
 } while (0)
 
 #define ADD_SNS(buf, s1, n1, s2) \

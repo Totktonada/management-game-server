@@ -21,7 +21,7 @@
 #define DEFAULT_LISTENING_PORT 37187
 #define READ_BUFFER_SIZE 1024
 #define TIME_BETWEEN_TIME_EVENTS 10
-#define WARNINGS_BEFORE_ROUND 5
+#define WARNINGS_BEFORE_ROUND 6
 
 #include "parser.h"
 #include "utils.h"
@@ -61,8 +61,8 @@ typedef struct client_info {
     int connected;
     int to_disconnect;
     disconnect_reasons reason;
-    int in_round;
-    int want_to_next_round;
+    unsigned int in_round:1;
+    unsigned int want_to_next_round:1;
     /* Read */
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
@@ -121,7 +121,7 @@ typedef struct server_info {
     int clients_count;
     int max_clients; /* -1 is without limitation */
     time_t time_to_next_event;
-    unsigned int warnings_count;
+    unsigned int backward_warnings_counter;
     /* Prompt and time data.
      * Prompt format:     "\n[%H:%M:%S] "
      * Async. msg format: "\n<%H:%M:%S> "
@@ -141,6 +141,7 @@ typedef struct server_info {
 void mark_client_to_disconnect (client_info *client,
     disconnect_reasons reason);
 void process_end_round (server_info *sinfo);
+void try_to_deferred_start_round (server_info *sinfo);
 
 #include "parameters.h"
 #include "game.h"

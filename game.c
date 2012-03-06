@@ -41,6 +41,7 @@ Available commands:\n\
 * buy count cost\n\
 * sell count cost\n\
 * turn\n\
+* join\n\
 \n\
 Command parser is case insensitive and have fun,\n\
 when you type commands in uppercase.\n\n";
@@ -152,6 +153,12 @@ Expenses:\n\
 * 1000 for one factory;\n\
 Raws, productions and factories counts used in expenses\n\
 calculation after processing all requests and offers.\n";
+
+const char msg_help_cmd_join[] = "\
+join\n\
+\n\
+Make request for particiation in next game round.\n\
+Forbidden if you currently in the round.\n";
 
 const char msg_help_cmd_wrong[] = "\
 Unknown command. See \"help\" (without argumenst)\n\
@@ -368,6 +375,9 @@ void print_cmd (command *cmd)
     case CMD_TURN:
         printf ("[CMD_TURN]\n");
         break;
+    case CMD_JOIN:
+        printf ("[CMD_JOIN]\n");
+        break;
     case CMD_WRONG:
         printf ("[CMD_WRONG]\n");
         break;
@@ -413,6 +423,9 @@ void do_cmd_help (client_info *client, char *cmd_name)
         break;
     case CMD_TURN:
         ADD_S (&(client->write_buf), msg_help_cmd_turn);
+        break;
+    case CMD_JOIN:
+        ADD_S (&(client->write_buf), msg_help_cmd_join);
         break;
     case CMD_WRONG:
         /* Unknown command. */
@@ -625,7 +638,7 @@ void write_player_information (client_info *client,
     ADD_S (write_buf, "\n");
 }
 
-void write_all_clients_information (server_info *sinfo,
+void write_all_players_information (server_info *sinfo,
     client_info *to_client)
 {
     client_info *cur_c;
@@ -656,7 +669,7 @@ void do_cmd_status (server_info *sinfo, client_info *client,
     {
         write_server_information (sinfo, &(client->write_buf));
         write_market_information (sinfo, &(client->write_buf));
-        write_all_clients_information (sinfo, client);
+        write_all_players_information (sinfo, client);
     } else if (STR_EQUAL_CASE_INS (nick, "--market")
         || STR_EQUAL_CASE_INS (nick, "-m"))
     {
@@ -664,7 +677,7 @@ void do_cmd_status (server_info *sinfo, client_info *client,
     } else if (STR_EQUAL_CASE_INS (nick, "--players")
         || STR_EQUAL_CASE_INS (nick, "-p"))
     {
-        write_all_clients_information (sinfo, client);
+        write_all_players_information (sinfo, client);
     } else if (STR_EQUAL_CASE_INS (nick, "--server")
         || STR_EQUAL_CASE_INS (nick, "-s"))
     {
@@ -769,7 +782,7 @@ void write_not_completed_step_clients (server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        if (cur_c->step_completed)
+        if (!cur_c->in_round || cur_c->step_completed)
             continue;
 
         if (first_nick) {
@@ -804,7 +817,8 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        all_compl = all_compl && cur_c->step_completed;
+        all_compl = all_compl &&
+            (!cur_c->in_round || cur_c->step_completed);
 
         if ((! cur_c->step_completed)
             || cur_c == client)
@@ -825,6 +839,23 @@ void do_cmd_turn (server_info *sinfo, client_info *client)
     if (all_compl) {
         game_process_next_step (sinfo);
     }
+}
+
+void do_cmd_join (server_info *sinfo, client_info *client)
+{
+    if (client->want_to_next_round) {
+        ADD_S (&(client->write_buf),
+"You already make request to participation\n\
+in next round.\n");
+        return;
+    }
+
+    client->want_to_next_round = 1;
+    ++(sinfo->players_count);
+    ADD_S (&(client->write_buf),
+"Okay! Your request to participating in next game round\n\
+is stored.\n");
+    /* TODO: maybe send notification for other users. */
 }
 
 void do_cmd_wrong (client_info *client)
@@ -858,14 +889,19 @@ int allow_command (client_info *client, command *cmd)
     case CMD_BUY:
     case CMD_SELL:
     case CMD_TURN:
-        if (client->in_round) {
-            /* sinfo->in round is 1. */
-            return 1;
-        } else {
+        if (! client->in_round) {
             ADD_S (&(client->write_buf),
-"This command is forbidden before start the game.\n");
-            return 0;
+"This command is forbidden before start the round.\n");
         }
+        /* sinfo->in_round is 1 if client->in_round is 1. */
+        return client->in_round;
+    case CMD_JOIN:
+        if (client->in_round) {
+            ADD_S (&(client->write_buf),
+"This command is forbidden for players,\n\
+which currently in the round.\n");
+        }
+        return (! client->in_round);
 
     case CMD_WRONG:
     case CMD_PROTOCOL_PARSE_ERROR:
@@ -915,6 +951,9 @@ int execute_cmd (server_info *sinfo,
         break;
     case CMD_TURN:
         do_cmd_turn (sinfo, client);
+        break;
+    case CMD_JOIN:
+        do_cmd_join (sinfo, client);
         break;
     case CMD_WRONG:
         do_cmd_wrong (client);
@@ -1147,7 +1186,7 @@ void bankrupt_notify_all_clients (server_info *sinfo,
     }
 }
 
-void write_winners (server_info *sinfo, msg_buffer *write_buf)
+void write_all_winners (server_info *sinfo, msg_buffer *write_buf)
 {
     client_info *cur_c;
     int first_nick = 1;
@@ -1156,7 +1195,7 @@ void write_winners (server_info *sinfo, msg_buffer *write_buf)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        if (cur_c->in_round)
+        if (! cur_c->in_round)
             continue;
 
         if (first_nick) {
@@ -1173,16 +1212,19 @@ void write_winners (server_info *sinfo, msg_buffer *write_buf)
         ADD_S (write_buf, "\n");
 }
 
-void try_to_process_win (server_info *sinfo)
+/* Winner must be existent and single. */
+void write_winner (server_info *sinfo)
 {
     client_info *cur_c;
+    client_info *winner;
 
-    if (sinfo->players_count >= 2) {
-        for (cur_c = sinfo->first_client;
-            cur_c != NULL;
-            cur_c = cur_c->next)
-        {
-            cur_c->in_round = 0;
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->money >= 0) {
+            winner = cur_c;
+            break;
         }
     }
 
@@ -1190,10 +1232,43 @@ void try_to_process_win (server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        write_winners (sinfo, &(cur_c->write_buf));
+        ADD_S (&(cur_c->write_buf), "Winner: ");
+        ADD_S_STRLEN (&(cur_c->write_buf), winner->nick);
+        ADD_S (&(cur_c->write_buf), "\n");
+    }
+}
+
+/* if (players_count > 1) continue game;
+ * if (players_count == 1) winner has (money >=0);
+ * if (players_count == 0) winners have (in_round == 1). */
+void try_to_process_win (server_info *sinfo)
+{
+    client_info *cur_c;
+
+    if (sinfo->players_count > 1)
+        return;
+
+    if (sinfo->players_count == 1) {
+        write_winner (sinfo);
+    } else {
+        /* sinfo->players_count == 0 */
+        for (cur_c = sinfo->first_client;
+            cur_c != NULL;
+            cur_c = cur_c->next)
+        {
+            write_all_winners (sinfo, &(cur_c->write_buf));
+        }
+    }
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        cur_c->in_round = 0;
     }
 
     process_end_round (sinfo);
+    try_to_deferred_start_round (sinfo);
 }
 
 void game_process_next_step (server_info *sinfo)
@@ -1217,6 +1292,9 @@ void game_process_next_step (server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        if (! cur_c->in_round)
+            continue;
+
         flush_auction_auxiliary_info (cur_c);
         grant_make_prod_request (cur_c);
         grant_build_factories_request (cur_c);
