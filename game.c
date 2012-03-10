@@ -1047,8 +1047,38 @@ request *get_request (request_group **group_pointer,
     return req;
 }
 
-void make_auction_request (request_type type, request *req,
-    unsigned int cost)
+void auction_notify_all (server_info *sinfo, request_type type,
+    request *req, unsigned int cost)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c == req->client)
+            continue;
+
+        if (type == REQUEST_RAW) {
+            ADD_S (&(cur_c->write_buf), "[Raw auction] [Player ");
+        } else { /* (type == REQUEST_PROD) */
+            ADD_S (&(cur_c->write_buf), "[Prod. auction] [Player ");
+        }
+        ADD_S_STRLEN (&(cur_c->write_buf), req->client->nick);
+        if (type == REQUEST_RAW) {
+            ADD_S (&(cur_c->write_buf), "] Buy raws: ");
+        } else { /* (type == REQUEST_PROD) */
+            ADD_S (&(cur_c->write_buf), "] Sell prod.: ");
+        }
+        ADD_N (&(cur_c->write_buf), req->count);
+        ADD_S (&(cur_c->write_buf), " / ");
+        ADD_N (&(cur_c->write_buf), cost);
+        ADD_S (&(cur_c->write_buf), "  (count / cost of one)\n");
+    }
+}
+
+void make_auction_request (server_info *sinfo, request_type type,
+    request *req, unsigned int cost)
 {
     switch (type) {
     case REQUEST_RAW:
@@ -1067,9 +1097,11 @@ void make_auction_request (request_type type, request *req,
             "[Prod. auction] Money: ", &(req->client->money),
             req->count, cost, "\n");
     }
+
+    auction_notify_all (sinfo, type, req, cost);
 }
 
-void make_auction (request_group **group_pointer,
+void make_auction (server_info *sinfo, request_group **group_pointer,
     request_type type, unsigned int market_count)
 {
     request *req;
@@ -1079,7 +1111,7 @@ void make_auction (request_group **group_pointer,
         req = get_request (group_pointer, &cost);
         if (market_count < req->count)
             req->count = market_count;
-        make_auction_request (type, req, cost);
+        make_auction_request (sinfo, type, req, cost);
         market_count -= req->count;
         free (req);
     }
@@ -1285,8 +1317,10 @@ void game_process_next_step (server_info *sinfo)
             "Yeah! All players completed this month!\n");
     }
 
-    make_auction (&(sinfo->buy_raw), REQUEST_RAW, market_raw_count);
-    make_auction (&(sinfo->sell_prod), REQUEST_PROD, market_prod_count);
+    make_auction (sinfo, &(sinfo->buy_raw),
+        REQUEST_RAW, market_raw_count);
+    make_auction (sinfo, &(sinfo->sell_prod),
+        REQUEST_PROD, market_prod_count);
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
