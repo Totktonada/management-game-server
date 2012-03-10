@@ -24,16 +24,16 @@
 #define MAKE_FACTORY_SECOND_HALF 2500
 #define MAKE_PROD_COST 2000
 
-void new_game_data (server_info *sinfo);
-void new_client_game_data (client_info *client);
+void new_game_data(server_info *sinfo);
+void new_client_game_data(client_info *client);
 
 #ifndef DAEMON
-void print_cmd (command *cmd);
+void print_cmd(command *cmd);
 #endif
 
-int execute_cmd (server_info *sinfo,
+int execute_cmd(server_info *sinfo,
     client_info *client, command *cmd);
 
-void game_process_next_step (server_info *sinfo);
+void game_process_next_step(server_info *sinfo);
 
 #endif

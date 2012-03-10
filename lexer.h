@@ -1,7 +1,7 @@
 #ifndef LEXER_H_SENTRY
 #define LEXER_H_SENTRY
 
-/* For isblank () */
+/* For isblank() */
 #define _POSIX_C_SOURCE 200112L
 
 #include <limits.h>
@@ -45,10 +45,10 @@ typedef struct lexer_info {
     unsigned int request_for_char:1;
 } lexer_info;
 
-void new_lexer_info (lexer_info *linfo);
-void put_new_data_to_lexer (lexer_info *linfo,
+void new_lexer_info(lexer_info *linfo);
+void put_new_data_to_lexer(lexer_info *linfo,
     char *read_buffer, int read_available);
-lexeme *get_lex (lexer_info *linfo);
-void destroy_lex (lexeme *lex, int free_data);
+lexeme *get_lex(lexer_info *linfo);
+void destroy_lex(lexeme *lex, int free_data);
 
 #endif

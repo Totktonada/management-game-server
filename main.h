@@ -1,7 +1,7 @@
 #ifndef MAIN_H_SENTRY
 #define MAIN_H_SENTRY
 
-/* For inet_aton () and daemon (). */
+/* For inet_aton() and daemon(). */
 #define _BSD_SOURCE
 
 #include <sys/time.h>
@@ -85,7 +85,7 @@ typedef struct client_info {
     unsigned int building_factory_2;
     unsigned int building_factory_3;
     unsigned int building_factory_4;
-    /* For write_client_information () */
+    /* For write_client_information() */
     unsigned int buy_raw_count;
     unsigned int buy_raw_cost;
     unsigned int sell_prod_count;
@@ -125,7 +125,7 @@ typedef struct server_info {
     /* Prompt and time data.
      * Prompt format:     "\n[%H:%M:%S] "
      * Async. msg format: "\n<%H:%M:%S> "
-     * See update_time_buf () in utils.c
+     * See update_time_buf() in utils.c
      * for more information. */
     char prefix_prompt[16];
     char prefix_async_msg[16];
@@ -138,10 +138,10 @@ typedef struct server_info {
     request_group *sell_prod;
 } server_info;
 
-void mark_client_to_disconnect (client_info *client,
+void mark_client_to_disconnect(client_info *client,
     disconnect_reasons reason);
-void process_end_round (server_info *sinfo);
-void try_to_deferred_start_round (server_info *sinfo);
+void process_end_round(server_info *sinfo);
+void try_to_deferred_start_round(server_info *sinfo);
 
 #include "parameters.h"
 #include "game.h"

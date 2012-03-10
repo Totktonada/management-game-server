@@ -2,9 +2,9 @@
 #define UTILS_H_SENTRY
 
 /* Case insensitive. */
-#define STR_EQUAL_CASE_INS(str1, str2) (strcasecmp ((str1), (str2)) == 0)
+#define STR_EQUAL_CASE_INS(str1, str2) (strcasecmp((str1), (str2)) == 0)
 /* Case sensitive. */
-#define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
+#define STR_EQUAL(str1, str2) (strcmp((str1), (str2)) == 0)
 
 #if 0 /* Not used. */
 #define MIN(n1, n2) (((n1) <= (n2)) ? (n1) : (n2))
@@ -22,12 +22,12 @@ typedef enum prefix_type {
     PREFIX_ASYNC_MSG
 } prefix_type;
 
-type_of_cmd get_cmd_type (char *str);
-unsigned int number_to_str (char *buf,
+type_of_cmd get_cmd_type(char *str);
+unsigned int number_to_str(char *buf,
     unsigned int number);
-unsigned int get_random (unsigned int max_value);
-unsigned int log10i (unsigned int number);
-void update_time_buf (char *time_buf, int buf_size,
+unsigned int get_random(unsigned int max_value);
+unsigned int log10i(unsigned int number);
+void update_time_buf(char *time_buf, int buf_size,
     prefix_type type);
 
 #endif

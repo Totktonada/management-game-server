@@ -4,8 +4,8 @@ HEADERS = $(SRCMODULES:.c=.h)
 EXEC_FILE = management-game-server
 
 DEFINE =
-#DEFINE = -DDAEMON # invoke daemon ();
-#DEFINE = -DDAEMON -DDAEMON_ALT # invoke daemon_alt (); see main.c.
+#DEFINE = -DDAEMON # invoke daemon();
+#DEFINE = -DDAEMON -DDAEMON_ALT # invoke daemon_alt(); see main.c.
 CFLAGS = -g -Wall -ansi -pedantic $(DEFINE)
 
 default: $(EXEC_FILE)

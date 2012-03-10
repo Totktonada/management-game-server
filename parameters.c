@@ -1,6 +1,6 @@
 #include "parameters.h"
 
-void process_cmd_line_parameters (server_info *sinfo,
+void process_cmd_line_parameters(server_info *sinfo,
     char **argv)
 {
     parameters_parser_state state = PARAM_P_ST_START;
@@ -11,13 +11,13 @@ void process_cmd_line_parameters (server_info *sinfo,
     while (*argv != NULL) {
         switch (state) {
         case PARAM_P_ST_START:
-            if (STR_EQUAL (*argv, "--port")
-                || STR_EQUAL (*argv, "-p"))
+            if (STR_EQUAL(*argv, "--port")
+                || STR_EQUAL(*argv, "-p"))
             {
                 state = PARAM_P_ST_PORT;
                 request_for_next_arg = 1;
-            } else if (STR_EQUAL (*argv, "--max")
-                || STR_EQUAL (*argv, "-m"))
+            } else if (STR_EQUAL(*argv, "--max")
+                || STR_EQUAL(*argv, "-m"))
             {
                 state = PARAM_P_ST_MAX;
                 request_for_next_arg = 1;
@@ -26,7 +26,7 @@ void process_cmd_line_parameters (server_info *sinfo,
             }
             break;
         case PARAM_P_ST_PORT:
-            sinfo->listening_port = atoi (*argv);
+            sinfo->listening_port = atoi(*argv);
             if (sinfo->listening_port == 0) {
                 state = PARAM_P_ST_ERROR;
             } else {
@@ -35,7 +35,7 @@ void process_cmd_line_parameters (server_info *sinfo,
             }
             break;
         case PARAM_P_ST_MAX:
-            sinfo->max_clients = atoi (*argv);
+            sinfo->max_clients = atoi(*argv);
             if (sinfo->max_clients == 0) {
                 state = PARAM_P_ST_ERROR;
             } else {
@@ -44,8 +44,8 @@ void process_cmd_line_parameters (server_info *sinfo,
             }
             break;
         case PARAM_P_ST_ERROR:
-            fprintf (stderr, "Wrong parameters!\n");
-            exit (ES_WRONG_PARAM);
+            fprintf(stderr, "Wrong parameters!\n");
+            exit(ES_WRONG_PARAM);
             break;
         }
 

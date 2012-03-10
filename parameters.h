@@ -19,7 +19,7 @@ typedef enum parameters_parser_state {
     PARAM_P_ST_ERROR
 } parameters_parser_state;
 
-void process_cmd_line_parameters (server_info *sinfo,
+void process_cmd_line_parameters(server_info *sinfo,
     char **argv);
 
 #endif
