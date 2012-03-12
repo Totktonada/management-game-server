@@ -105,8 +105,9 @@ build count\n\
 Start process of building count factories.\n\
 One factory cost:\n\
 * 2500 after current step\n\
-* and 2500 after (current + 5) step.\n\
-After second payment, count factories is ready to work.\n";
+* and 2500 after (current + 4) step.\n\
+After one month after second payment,\n\
+count factories is ready to work.\n";
 
 /* TODO: use MAKE_PROD_COST macro. */
 const char msg_help_cmd_make[] = "\
