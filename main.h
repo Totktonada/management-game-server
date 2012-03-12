@@ -112,6 +112,7 @@ typedef struct request_group {
 
 typedef struct server_info {
     /* Connecting data */
+    const char *server_ip;
     int listening_port;
     int listening_socket;
     fd_set read_fds;

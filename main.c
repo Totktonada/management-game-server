@@ -82,7 +82,7 @@ void get_listening_socket(server_info *sinfo)
     addr.sin_port = htons(sinfo->listening_port);
     /* addr.sin_addr.s_addr = INADDR_ANY; */
     if (INET_ATON_ERROR(
-            inet_aton("127.0.0.1", &(addr.sin_addr))))
+            inet_aton(sinfo->server_ip, &(addr.sin_addr))))
     {
         perror("inet_aton()");
         exit(ES_SYSCALL_FAILED);

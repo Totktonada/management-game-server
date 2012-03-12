@@ -1,12 +1,13 @@
 #include "parameters.h"
 
-void process_cmd_line_parameters(server_info *sinfo,
-    char **argv)
+void process_cmd_line_parameters(server_info *sinfo, char **argv)
 {
     parameters_parser_state state = PARAM_P_ST_START;
     int request_for_next_arg = 0;
 
     sinfo->max_clients = -1; /* by default - without limitation */
+    sinfo->server_ip = NULL; /* by default - "127.0.0.1", see
+                                after while */
 
     while (*argv != NULL) {
         switch (state) {
@@ -20,6 +21,14 @@ void process_cmd_line_parameters(server_info *sinfo,
                 || STR_EQUAL(*argv, "-m"))
             {
                 state = PARAM_P_ST_MAX;
+                request_for_next_arg = 1;
+            } else {
+                state = PARAM_P_ST_IP;
+            }
+            break;
+        case PARAM_P_ST_IP:
+            if (sinfo->server_ip == NULL) {
+                sinfo->server_ip = *argv;
                 request_for_next_arg = 1;
             } else {
                 state = PARAM_P_ST_ERROR;
@@ -54,4 +63,8 @@ void process_cmd_line_parameters(server_info *sinfo,
             request_for_next_arg = 0;
         }
     } /* while */
+
+    if (sinfo->server_ip == NULL) {
+        sinfo->server_ip = "127.0.0.1";
+    }
 }
