@@ -188,6 +188,14 @@ void new_game_data(server_info *sinfo)
     sinfo->sell_prod = NULL;
 }
 
+void flush_auction_auxiliary_info(client_info *client)
+{
+    client->buy_raw_count = 0;
+    client->buy_raw_cost = 0;
+    client->sell_prod_count = 0;
+    client->sell_prod_cost = 0;
+}
+
 void new_client_game_data(client_info *client)
 {
     /* Nick would be changed in process_new_client() in "main.c". */
@@ -200,6 +208,13 @@ void new_client_game_data(client_info *client)
 
     client->build_factory_count = 0;
     client->make_prod_count = 0;
+
+    client->building_factory_1 = 0;
+    client->building_factory_2 = 0;
+    client->building_factory_3 = 0;
+    client->building_factory_4 = 0;
+
+    flush_auction_auxiliary_info(client);
 }
 
 request *new_request(client_info *client,
@@ -1196,14 +1211,6 @@ void change_level(server_info *sinfo)
             return;
         }
     }
-}
-
-void flush_auction_auxiliary_info(client_info *client)
-{
-    client->buy_raw_count = 0;
-    client->buy_raw_cost = 0;
-    client->sell_prod_count = 0;
-    client->sell_prod_cost = 0;
 }
 
 void bankrupt_notify_all_clients(server_info *sinfo,

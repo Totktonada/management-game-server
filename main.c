@@ -132,13 +132,14 @@ client_info *new_client_info(int client_socket)
     client->fd = client_socket;
     client->connected = 0;
     client->to_disconnect = 0;
+    /* client->reason is undefined when (client->to_disconnect == 0) */
     client->in_round = 0;
     client->want_to_next_round = 0;
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
     new_parser_info(&(client->pinfo));
-    new_client_game_data(client);
     new_msg_buffer(&(client->write_buf));
+    new_client_game_data(client);
     return client;
 }
 
