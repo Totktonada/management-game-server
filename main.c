@@ -534,6 +534,7 @@ in game round, less then two.\n");
             cur_c->want_to_next_round = 0;
             ADD_S(&(cur_c->write_buf),
 "Game ready! You are player of this game round.\n");
+            new_client_game_data(cur_c);
             /* TODO: write count and list of players. */
         } else {
             ADD_S(&(cur_c->write_buf),
