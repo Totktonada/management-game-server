@@ -171,11 +171,11 @@ Okay! Your request stored to after-step processing.\n";
 
 /* For do_cmd_buy() and do_cmd_sell(). */
 const char msg_cost_out_of_range[] = "\
-Your cost is out of range. Request rejected.\n\
+Your *cost* is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
 
 const char msg_count_out_of_range[] = "\
-Your count is out of range. Request rejected.\n\
+Your *count* is out of range. Request rejected.\n\
 See information by \"status\" command.\n";
 
 /* =========== */
@@ -708,10 +708,17 @@ void do_cmd_make(client_info *client, int count)
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
         ADD_S(&(client->write_buf),
-"You have too few factories. Request rejected.\n\
+"You have too few *factories*. Request rejected.\n\
 See information by \"status\" command.\n");
         return;
     }
+    if (count > client->raw_count) {
+        ADD_S(&(client->write_buf),
+"You have too few *raws*. Request rejected.\n\
+See information by \"status\" command.\n");
+        return;
+    }
+
 
     client->make_prod_count = count;
 
