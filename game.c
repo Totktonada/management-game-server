@@ -166,6 +166,8 @@ Unknown command. See \"help\" (without argumenst)\n\
 for available commands list.\n";
 
 /* "OK" response, for commands with request semantic. */
+const char msg_request_flushed[] = "\
+Okay! Your request flushed.\n";
 const char msg_request_stored[] = "\
 Okay! Your request stored to after-step processing.\n";
 const char msg_request_replaced[] = "\
@@ -797,7 +799,9 @@ void do_cmd_build(client_info *client, int count)
     /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
-    if (already_requested) {
+    if (count == 0) {
+        ADD_S(&(client->write_buf), msg_request_flushed);
+    } else if (already_requested) {
         ADD_S(&(client->write_buf), msg_request_replaced);
     } else {
         ADD_S(&(client->write_buf), msg_request_stored);
@@ -825,7 +829,9 @@ See information by \"status\" command.\n");
 
     client->make_prod_count = count;
 
-    if (already_requested) {
+    if (count == 0) {
+        ADD_S(&(client->write_buf), msg_request_flushed);
+    } else if (already_requested) {
         ADD_S(&(client->write_buf), msg_request_replaced);
     } else {
         ADD_S(&(client->write_buf), msg_request_stored);
@@ -850,6 +856,13 @@ void do_cmd_buy(server_info *sinfo, client_info *client,
 
     if (already_requested)
         free_request_by_client(&(sinfo->buy_raw), client);
+
+    if (count == 0) {
+        client->buy_raw_count = 0;
+        client->buy_raw_cost = 0;
+        ADD_S(&(client->write_buf), msg_request_flushed);
+        return;
+    }
 
     req = new_request(client, count);
     add_buy_raw_request(sinfo, cost, req);
@@ -889,6 +902,13 @@ See information by \"status\" command.\n");
 
     if (already_requested)
         free_request_by_client(&(sinfo->sell_prod), client);
+
+    if (count == 0) {
+        client->sell_prod_count = 0;
+        client->sell_prod_cost = 0;
+        ADD_S(&(client->write_buf), msg_request_flushed);
+        return;
+    }
 
     req = new_request(client, count);
     add_sell_prod_request(sinfo, cost, req);
