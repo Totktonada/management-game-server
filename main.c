@@ -129,6 +129,7 @@ client_info *new_client_info(int client_socket)
     client_info *client = (client_info *)
         malloc(sizeof(client_info));
     client->next = NULL;
+    client->nick = NULL;
     client->fd = client_socket;
     client->connected = 0;
     client->to_disconnect = 0;

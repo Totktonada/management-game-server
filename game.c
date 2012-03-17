@@ -199,7 +199,6 @@ void flush_auction_auxiliary_info(client_info *client)
 void new_client_game_data(client_info *client)
 {
     /* Nick would be changed in process_new_client() in "main.c". */
-    client->nick = NULL;
     client->money = START_MONEY;
     client->raw_count = START_RAW_COUNT;
     client->prod_count = START_PROD_COUNT;

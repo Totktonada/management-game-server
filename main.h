@@ -57,6 +57,7 @@ typedef enum disconnect_reasons {
 typedef struct client_info {
     /* Common */
     struct client_info *next;
+    char *nick;
     int fd;
     int connected;
     int to_disconnect;
@@ -70,7 +71,6 @@ typedef struct client_info {
     /* Write */
     msg_buffer write_buf;
     /* Client game data */
-    char *nick;
     int money;
     unsigned int raw_count;
     unsigned int prod_count;
