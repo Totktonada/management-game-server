@@ -168,6 +168,8 @@ for available commands list.\n";
 /* "OK" response, for commands with request semantic. */
 const char msg_request_stored[] = "\
 Okay! Your request stored to after-step processing.\n";
+const char msg_request_replaced[] = "\
+Okay! Your old request replaced with this.\n";
 
 /* For do_cmd_buy() and do_cmd_sell(). */
 const char msg_cost_out_of_range[] = "\
@@ -335,6 +337,85 @@ void add_sell_prod_request(server_info *sinfo,
     req->next = group->first_req;
     group->first_req = req;
     ++(group->req_count);
+}
+
+void try_to_free_group(request_group **group_pointer,
+    request_group *group, request_group *prev_group)
+{
+    if (group->req_count != 0)
+        return;
+
+    /* Group empty */
+    if (prev_group == NULL) {
+        *group_pointer = group->next;
+    } else {
+        prev_group->next = group->next;
+    }
+
+    free(group);
+}
+
+/* Remove from structures and free pointer client.
+ * Returns:
+ * 1, if request by pointed client found;
+ * 0, otherwise. */
+int free_request_in_group_by_client(request_group **group_pointer,
+    client_info *client, request_group *group,
+    request_group *prev_group)
+{
+    request *prev_req = NULL;
+    request *cur_req = group->first_req;
+
+    while (cur_req != NULL) {
+        if (cur_req->client != client) {
+            prev_req = cur_req;
+            cur_req = cur_req->next;
+            continue;
+        }
+
+        /* Request found. */
+        --(group->req_count);
+
+        if (cur_req == group->first_req) {
+            /* Free first request in group. */
+            group->first_req = cur_req->next;
+            try_to_free_group(group_pointer, group, prev_group);
+        } else {
+            prev_req->next = cur_req->next;
+            /* We absolutely sure that group is not empty. */
+        }
+
+        free(cur_req);
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Free and remove from structures
+ * request added by pointed client.
+ * If request by this client not found or
+ * (client == NULL) then do nothing. */
+void free_request_by_client(request_group **group_pointer,
+    client_info *client)
+{
+    request_group *prev_group = NULL;
+    request_group *group = *group_pointer;
+
+    if (client == NULL)
+        return;
+
+    while (group != NULL) {
+        if (free_request_in_group_by_client(
+            group_pointer, client,
+            group, prev_group))
+        {
+            return;
+        }
+
+        prev_group = group;
+        group = group->next;
+    }
 }
 
 /* Calculate raw count for current market level.
@@ -711,14 +792,22 @@ void do_cmd_status(server_info *sinfo, client_info *client,
 
 void do_cmd_build(client_info *client, int count)
 {
+    int already_requested = (client->build_factory_count > 0);
+
     /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
-    ADD_S(&(client->write_buf), msg_request_stored);
+    if (already_requested) {
+        ADD_S(&(client->write_buf), msg_request_replaced);
+    } else {
+        ADD_S(&(client->write_buf), msg_request_stored);
+    }
 }
 
 void do_cmd_make(client_info *client, int count)
 {
+    int already_requested = (client->make_prod_count > 0);
+
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
         ADD_S(&(client->write_buf),
@@ -726,6 +815,7 @@ void do_cmd_make(client_info *client, int count)
 See information by \"status\" command.\n");
         return;
     }
+
     if (count > client->raw_count) {
         ADD_S(&(client->write_buf),
 "You have too few *raws*. Request rejected.\n\
@@ -733,16 +823,20 @@ See information by \"status\" command.\n");
         return;
     }
 
-
     client->make_prod_count = count;
 
-    ADD_S(&(client->write_buf), msg_request_stored);
+    if (already_requested) {
+        ADD_S(&(client->write_buf), msg_request_replaced);
+    } else {
+        ADD_S(&(client->write_buf), msg_request_stored);
+    }
 }
 
 void do_cmd_buy(server_info *sinfo, client_info *client,
     int count, int cost)
 {
     request *req;
+    int already_requested = (client->buy_raw_count > 0);
 
     if (count > get_market_raw_count(sinfo)) {
         ADD_S(&(client->write_buf), msg_count_out_of_range);
@@ -754,19 +848,27 @@ void do_cmd_buy(server_info *sinfo, client_info *client,
         return;
     }
 
+    if (already_requested)
+        free_request_by_client(&(sinfo->buy_raw), client);
+
     req = new_request(client, count);
     add_buy_raw_request(sinfo, cost, req);
 
     client->buy_raw_count = count;
     client->buy_raw_cost = cost;
 
-    ADD_S(&(client->write_buf), msg_request_stored);
+    if (already_requested) {
+        ADD_S(&(client->write_buf), msg_request_replaced);
+    } else {
+        ADD_S(&(client->write_buf), msg_request_stored);
+    }
 }
 
 void do_cmd_sell(server_info *sinfo, client_info *client,
     int count, int cost)
 {
     request *req;
+    int already_requested = (client->sell_prod_count > 0);
 
     if (count > get_market_prod_count(sinfo)) {
         ADD_S(&(client->write_buf), msg_count_out_of_range);
@@ -785,13 +887,20 @@ See information by \"status\" command.\n");
         return;
     }
 
+    if (already_requested)
+        free_request_by_client(&(sinfo->sell_prod), client);
+
     req = new_request(client, count);
     add_sell_prod_request(sinfo, cost, req);
 
     client->sell_prod_count = count;
     client->sell_prod_cost = cost;
 
-    ADD_S(&(client->write_buf), msg_request_stored);
+    if (already_requested) {
+        ADD_S(&(client->write_buf), msg_request_replaced);
+    } else {
+        ADD_S(&(client->write_buf), msg_request_stored);
+    }
 }
 
 void write_not_completed_step_clients(server_info *sinfo,
