@@ -256,8 +256,14 @@ void try_to_unregister_client(server_info *sinfo, client_info *client)
             if (cur_c->in_round) {
                 /* TODO: maybe separate message for players. */
                 --(sinfo->players_count);
+                if (sinfo->players_count <= 1) {
+                    process_end_round(sinfo);
+                    try_to_deferred_start_round(sinfo);
+                }
             }
-            try_to_stop_deferred_start_round(sinfo);
+            if (! sinfo->in_round) {
+                try_to_stop_deferred_start_round(sinfo);
+            }
             break;
         }
 
@@ -444,6 +450,15 @@ void process_new_client(server_info *sinfo, int listening_socket)
 
 void process_end_round(server_info *sinfo)
 {
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        cur_c->in_round = 0;
+    }
+
     sinfo->players_count = 0;
     sinfo->in_round = 0;
     sinfo->time_to_next_event = -1;

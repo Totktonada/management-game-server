@@ -1092,13 +1092,6 @@ void try_to_process_win(server_info *sinfo)
         }
     }
 
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        cur_c->in_round = 0;
-    }
-
     process_end_round(sinfo);
     try_to_deferred_start_round(sinfo);
 }
