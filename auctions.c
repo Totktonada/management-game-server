@@ -275,7 +275,7 @@ request *get_request(request_group **group_pointer,
 }
 
 void auction_notify_all(server_info *sinfo, request_type type,
-    request *req, unsigned int cost)
+    request *req, unsigned int cost, int add_head)
 {
     client_info *cur_c;
 
@@ -286,16 +286,21 @@ void auction_notify_all(server_info *sinfo, request_type type,
         if (cur_c == req->client)
             continue;
 
-        if (type == REQUEST_RAW) {
-            ADD_S(&(cur_c->write_buf), "[Raw auction] [Player ");
-        } else { /* (type == REQUEST_PROD) */
-            ADD_S(&(cur_c->write_buf), "[Prod. auction] [Player ");
+        if (add_head) {
+            if (type == REQUEST_RAW) {
+                add_msg_head(&(cur_c->write_buf),
+                    "[Raw auction]\n", MSG_ASYNC);
+            } else { /* (type == REQUEST_PROD) */
+                add_msg_head(&(cur_c->write_buf),
+                    "[Production auction]\n", MSG_ASYNC);
+            }
         }
+        ADD_S(&(cur_c->write_buf), "Player ");
         ADD_S_STRLEN(&(cur_c->write_buf), req->client->nick);
         if (type == REQUEST_RAW) {
-            ADD_S(&(cur_c->write_buf), "] Buy raws: ");
+            ADD_S(&(cur_c->write_buf), " buy raws: ");
         } else { /* (type == REQUEST_PROD) */
-            ADD_S(&(cur_c->write_buf), "] Sell prod.: ");
+            ADD_S(&(cur_c->write_buf), " sell prod.: ");
         }
         ADD_N(&(cur_c->write_buf), req->count);
         ADD_S(&(cur_c->write_buf), " / ");
@@ -305,27 +310,35 @@ void auction_notify_all(server_info *sinfo, request_type type,
 }
 
 void make_auction_request(server_info *sinfo, request_type type,
-    request *req, unsigned int cost)
+    request *req, unsigned int cost, int add_head)
 {
     switch (type) {
     case REQUEST_RAW:
+        if (add_head) {
+            add_msg_head(&(req->client->write_buf),
+                "[Raw auction]\n", MSG_ASYNC);
+        }
         VAR_CHANGE(&(req->client->write_buf),
-            "[Raw auction] Raw: ", &(req->client->raw_count),
+            "Raw: ", &(req->client->raw_count),
             req->count, "\n");
         VAR_CHANGE_MULT(&(req->client->write_buf),
-            "[Raw auction] Money: ", &(req->client->money),
+            "Money: ", &(req->client->money),
             req->count, -((int) cost), "\n");
         break;
     case REQUEST_PROD:
+        if (add_head) {
+            add_msg_head(&(req->client->write_buf),
+                "[Production auction]\n", MSG_ASYNC);
+        }
         VAR_CHANGE(&(req->client->write_buf),
-            "[Prod. auction] Prod.: ", &(req->client->prod_count),
+            "Production: ", &(req->client->prod_count),
             -((int) req->count), "\n");
         VAR_CHANGE_MULT(&(req->client->write_buf),
-            "[Prod. auction] Money: ", &(req->client->money),
+            "Money: ", &(req->client->money),
             req->count, cost, "\n");
     }
 
-    auction_notify_all(sinfo, type, req, cost);
+    auction_notify_all(sinfo, type, req, cost, add_head);
 }
 
 void make_auction(server_info *sinfo,
@@ -334,14 +347,17 @@ void make_auction(server_info *sinfo,
 {
     request *req;
     unsigned int cost;
+    int first_iteration = 1;
 
     while (market_count != 0 && *group_pointer != NULL) {
         req = get_request(group_pointer, &cost);
         if (market_count < req->count)
             req->count = market_count;
-        make_auction_request(sinfo, type, req, cost);
+        make_auction_request(sinfo, type, req, cost,
+            first_iteration);
         market_count -= req->count;
         free(req);
+        first_iteration = 0;
     }
 
     while (*group_pointer != NULL) {

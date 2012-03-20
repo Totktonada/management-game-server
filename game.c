@@ -952,7 +952,7 @@ void after_step_expenses(client_info *client)
 {
     if (client->raw_count > 0) {
         add_msg_head(&(client->write_buf),
-            "[Raw expenses] ", MSG_ASYNC);
+            "[Raw expenses]\n", MSG_ASYNC);
         VAR_CHANGE_MULT(&(client->write_buf),
             "Money: ", &(client->money),
             client->raw_count, -((int) RAW_EXPENSES), "\n");
@@ -960,7 +960,7 @@ void after_step_expenses(client_info *client)
 
     if (client->prod_count > 0) {
         add_msg_head(&(client->write_buf),
-            "[Prod. expenses] ", MSG_ASYNC);
+            "[Prod. expenses]\n", MSG_ASYNC);
 
         VAR_CHANGE_MULT(&(client->write_buf),
             "Money: ", &(client->money),
@@ -969,7 +969,7 @@ void after_step_expenses(client_info *client)
 
     if (client->factory_count > 0) {
         add_msg_head(&(client->write_buf),
-            "[Factory expenses] ", MSG_ASYNC);
+            "[Factory expenses]\n", MSG_ASYNC);
         VAR_CHANGE_MULT(&(client->write_buf),
             "Money: ", &(client->money),
             client->factory_count, -((int) FACTORY_EXPENSES), "\n");
@@ -1074,7 +1074,7 @@ void bankrupt_notify_all_clients(server_info *sinfo,
         cur_c = cur_c->next)
     {
         add_msg_head(&(cur_c->write_buf),
-            "[Bankrupting] ", MSG_ASYNC);
+            "[Bankrupting]\n", MSG_ASYNC);
 
         if (cur_c == client) {
             ADD_S(&(cur_c->write_buf), "You are bankrupt!\n");
