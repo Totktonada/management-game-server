@@ -21,7 +21,7 @@
 #include "parser.h"
 
 typedef enum time_buf_type {
-    TIME_BUF_PROMPT,
+    TIME_BUF_PROMPT_AND_RESPONCE,
     TIME_BUF_ASYNC_MSG
 } time_buf_type;
 

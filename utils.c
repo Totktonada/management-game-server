@@ -93,7 +93,7 @@ void update_time_buf(char *time_buf, int buf_size,
         ok = 0;
     }
 
-    if (ok && (type == TIME_BUF_PROMPT)) {
+    if (ok && (type == TIME_BUF_PROMPT_AND_RESPONCE)) {
         strftime_value = strftime(time_buf, buf_size,
             "\n[%H:%M:%S] ", localtime_var);
     } else if (ok && (type == TIME_BUF_ASYNC_MSG)) {

@@ -7,7 +7,8 @@ void add_prompt(client_info *client)
 {
     char prompt[TIME_BUFFER_SIZE]; /* TODO: static? */
 
-    update_time_buf(prompt, sizeof(prompt), TIME_BUF_PROMPT);
+    update_time_buf(prompt, sizeof(prompt),
+        TIME_BUF_PROMPT_AND_RESPONCE);
     ADD_S_STRLEN_MAKE_COPY(&(client->write_buf), prompt);
     ADD_S_STRLEN(&(client->write_buf), client->nick);
     ADD_S(&(client->write_buf), " $ ");
@@ -19,14 +20,17 @@ void add_prompt(client_info *client)
 void add_msg_head(msg_buffer *write_buf, char *head_str,
     msg_type type)
 {
-    char head_async_msg[TIME_BUFFER_SIZE]; /* TODO: static? */
+    char time_buf[TIME_BUFFER_SIZE]; /* TODO: static? */
 
     if (type == MSG_ASYNC) {
-        update_time_buf(head_async_msg,
-            sizeof(head_async_msg), TIME_BUF_ASYNC_MSG);
-        ADD_S_STRLEN_MAKE_COPY(write_buf, head_async_msg);
+        update_time_buf(time_buf,
+            sizeof(time_buf), TIME_BUF_ASYNC_MSG);
+    } else { /* type == MSG_RESPONCE */
+        update_time_buf(time_buf,
+            sizeof(time_buf), TIME_BUF_PROMPT_AND_RESPONCE);
     }
 
+    ADD_S_STRLEN_MAKE_COPY(write_buf, time_buf);
     /* TODO: remove strlen. */
     ADD_S_STRLEN(write_buf, head_str);
 }

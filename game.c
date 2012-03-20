@@ -281,6 +281,9 @@ void print_cmd(command *cmd)
 /* See msg_help_* strings in top of this file. */
 void do_cmd_help(client_info *client, char *cmd_name)
 {
+    add_msg_head(&(client->write_buf),
+        "[Help]\n", MSG_RESPONCE);
+
     if (cmd_name == NULL) {
         ADD_S(&(client->write_buf), msg_help_common_part1);
         ADD_S(&(client->write_buf), msg_help_common_part2);
@@ -351,6 +354,9 @@ void do_cmd_nick(server_info *sinfo, client_info *client, char *nick)
 {
     client_info *cur_c;
 
+    add_msg_head(&(client->write_buf),
+        "[Username changing]\n", MSG_RESPONCE);
+
     if (nick != NULL) {
         /* If starts with '-'. */
         if (*nick == '-') {
@@ -375,6 +381,9 @@ void do_cmd_nick(server_info *sinfo, client_info *client, char *nick)
         {
             if (cur_c == client)
                 continue;
+
+            add_msg_head(&(cur_c->write_buf),
+                "[Username changing]\n", MSG_ASYNC);
 
             ADD_S(&(cur_c->write_buf), "Username change: ");
             ADD_S_STRLEN_MAKE_COPY(&(cur_c->write_buf), client->nick);
@@ -549,6 +558,9 @@ void do_cmd_status(server_info *sinfo, client_info *client,
 {
     client_info *pointed_client = NULL;
 
+    add_msg_head(&(client->write_buf),
+        "[Status]\n", MSG_RESPONCE);
+
     if (nick == NULL && client->in_round) {
         write_player_information(client, &(client->write_buf), 1);
     } else if (nick == NULL && ! client->in_round) {
@@ -587,6 +599,9 @@ void do_cmd_build(client_info *client, int count)
 {
     int already_requested = (client->build_factory_count > 0);
 
+    add_msg_head(&(client->write_buf),
+        "[Build]\n", MSG_RESPONCE);
+
     /* TODO: check money (nessessary?). */
     client->build_factory_count = count;
 
@@ -602,6 +617,9 @@ void do_cmd_build(client_info *client, int count)
 void do_cmd_make(client_info *client, int count)
 {
     int already_requested = (client->make_prod_count > 0);
+
+    add_msg_head(&(client->write_buf),
+        "[Make]\n", MSG_RESPONCE);
 
     /* TODO: check money (nessessary?). */
     if (count > client->factory_count) {
@@ -634,6 +652,9 @@ void do_cmd_buy(server_info *sinfo, client_info *client,
 {
     request *req;
     int already_requested = (client->buy_raw_count > 0);
+
+    add_msg_head(&(client->write_buf),
+        "[Buy]\n", MSG_RESPONCE);
 
     if (count > get_market_raw_count(sinfo)) {
         ADD_S(&(client->write_buf), msg_count_out_of_range);
@@ -673,6 +694,9 @@ void do_cmd_sell(server_info *sinfo, client_info *client,
 {
     request *req;
     int already_requested = (client->sell_prod_count > 0);
+
+    add_msg_head(&(client->write_buf),
+        "[Sell]\n", MSG_RESPONCE);
 
     if (count > get_market_prod_count(sinfo)) {
         ADD_S(&(client->write_buf), msg_count_out_of_range);
@@ -747,6 +771,8 @@ void do_cmd_turn(server_info *sinfo, client_info *client)
     int all_compl;
 
     if (client->step_completed) {
+        add_msg_head(&(client->write_buf),
+            "[Turn]\n", MSG_RESPONCE);
         ADD_S(&(client->write_buf),
 "This month already completed, wait for other players.\n");
         return;
@@ -768,6 +794,8 @@ void do_cmd_turn(server_info *sinfo, client_info *client)
             continue;
         }
 
+        add_msg_head(&(cur_c->write_buf),
+            "[Turn]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf), "Client ");
         ADD_S_STRLEN(&(cur_c->write_buf), client->nick);
         ADD_S(&(cur_c->write_buf), " completed this month.\n");
@@ -775,6 +803,8 @@ void do_cmd_turn(server_info *sinfo, client_info *client)
         write_not_completed_step_clients(sinfo, &(cur_c->write_buf));
     }
 
+    add_msg_head(&(client->write_buf),
+        "[Turn]\n", MSG_RESPONCE);
     ADD_S(&(client->write_buf), "This month completed.\n");
     write_not_completed_step_clients(sinfo, &(client->write_buf));
 
@@ -785,6 +815,9 @@ void do_cmd_turn(server_info *sinfo, client_info *client)
 
 void do_cmd_join(server_info *sinfo, client_info *client)
 {
+    add_msg_head(&(client->write_buf),
+        "[Join]\n", MSG_RESPONCE);
+
     if (client->want_to_next_round) {
         ADD_S(&(client->write_buf),
 "You already make request to participation\n\
@@ -802,6 +835,9 @@ is stored.\n");
 
 void do_cmd_wrong(client_info *client)
 {
+    add_msg_head(&(client->write_buf),
+        "[Wrong]\n", MSG_RESPONCE);
+
     ADD_S(&(client->write_buf),
 "Wrong command or argument(s). See \"help\"\n\
 for information about available commands.\n");
@@ -832,6 +868,8 @@ int allow_command(client_info *client, command *cmd)
     case CMD_SELL:
     case CMD_TURN:
         if (! client->in_round) {
+            add_msg_head(&(client->write_buf),
+                "[Command forbidden]\n", MSG_RESPONCE);
             ADD_S(&(client->write_buf),
 "This command is forbidden before start the round.\n");
         }
@@ -839,6 +877,8 @@ int allow_command(client_info *client, command *cmd)
         return client->in_round;
     case CMD_JOIN:
         if (client->in_round) {
+            add_msg_head(&(client->write_buf),
+                "[Command forbidden]\n", MSG_RESPONCE);
             ADD_S(&(client->write_buf),
 "This command is forbidden for players,\n\
 which currently in the round.\n");
@@ -911,20 +951,27 @@ int execute_cmd(server_info *sinfo,
 void after_step_expenses(client_info *client)
 {
     if (client->raw_count > 0) {
+        add_msg_head(&(client->write_buf),
+            "[Raw expenses] ", MSG_ASYNC);
         VAR_CHANGE_MULT(&(client->write_buf),
-            "[Raw expenses] Money: ", &(client->money),
+            "Money: ", &(client->money),
             client->raw_count, -((int) RAW_EXPENSES), "\n");
     }
 
     if (client->prod_count > 0) {
+        add_msg_head(&(client->write_buf),
+            "[Prod. expenses] ", MSG_ASYNC);
+
         VAR_CHANGE_MULT(&(client->write_buf),
-            "[Prod. expenses] Money: ", &(client->money),
+            "Money: ", &(client->money),
             client->prod_count, -((int) PROD_EXPENSES), "\n");
     }
 
     if (client->factory_count > 0) {
+        add_msg_head(&(client->write_buf),
+            "[Factory expenses] ", MSG_ASYNC);
         VAR_CHANGE_MULT(&(client->write_buf),
-            "[Factory expenses] Money: ", &(client->money),
+            "Money: ", &(client->money),
             client->factory_count, -((int) FACTORY_EXPENSES), "\n");
     }
 }
@@ -938,25 +985,34 @@ void grant_make_prod_request(client_info *client)
     if (client->make_prod_count == 0)
         return;
 
+    add_msg_head(&(client->write_buf),
+        "[Make production]\n", MSG_ASYNC);
+
     /* Make production. */
     VAR_CHANGE(&(client->write_buf),
-        "[Make production] Raw: ", &(client->raw_count),
+        "Raw: ", &(client->raw_count),
         -((int) client->make_prod_count), "\n");
     VAR_CHANGE(&(client->write_buf),
-        "[Make production] Prod.: ", &(client->prod_count),
+        "Prod.: ", &(client->prod_count),
         client->make_prod_count, "\n");
     VAR_CHANGE_MULT(&(client->write_buf),
-        "[Make production] Money: ", &(client->money),
+        "Money: ", &(client->money),
         client->make_prod_count, -((int) MAKE_PROD_COST), "\n");
     client->make_prod_count = 0;
 }
 
 void grant_build_factories_request(client_info *client)
 {
+    int head_added = 0;
+
     /* Build factories. */
     if (client->building_factory_4 > 0) {
+        add_msg_head(&(client->write_buf),
+            "[Building factories]\n", MSG_ASYNC);
+        head_added = 1;
+
         VAR_CHANGE(&(client->write_buf),
-            "[Building] Factories: ", &(client->factory_count),
+            "Factories: ", &(client->factory_count),
             client->building_factory_4, "\n");
     }
 
@@ -967,15 +1023,24 @@ void grant_build_factories_request(client_info *client)
     client->build_factory_count = 0;
 
     if (client->building_factory_1 > 0) {
+        if (!head_added) {
+            add_msg_head(&(client->write_buf),
+                "[Building factories]\n", MSG_ASYNC);
+            head_added = 1;
+        }
         VAR_CHANGE_MULT(&(client->write_buf),
-            "[Building, payment 1] Money: ", &(client->money),
+            "Money (payment 1): ", &(client->money),
             client->building_factory_1,
             -((int) MAKE_FACTORY_FIRST_HALF), "\n");
     }
 
     if (client->building_factory_4 > 0) {
+        if (!head_added) {
+            add_msg_head(&(client->write_buf),
+                "[Building factories]\n", MSG_ASYNC);
+        }
         VAR_CHANGE_MULT(&(client->write_buf),
-            "[Building, payment 2] Money: ", &(client->money),
+            "Money (payment 2): ", &(client->money),
             client->building_factory_4,
             -((int) MAKE_FACTORY_SECOND_HALF), "\n");
     }
@@ -1008,6 +1073,9 @@ void bankrupt_notify_all_clients(server_info *sinfo,
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        add_msg_head(&(cur_c->write_buf),
+            "[Bankrupting] ", MSG_ASYNC);
+
         if (cur_c == client) {
             ADD_S(&(cur_c->write_buf), "You are bankrupt!\n");
         } else {
@@ -1031,6 +1099,7 @@ void write_all_winners(server_info *sinfo, msg_buffer *write_buf)
             continue;
 
         if (first_nick) {
+            add_msg_head(write_buf, "[Winner(s)]\n", MSG_ASYNC);
             ADD_S(write_buf, "Winners: ");
         } else {
             ADD_S(write_buf, ", ");
@@ -1064,6 +1133,8 @@ void write_winner(server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        add_msg_head(&(cur_c->write_buf),
+            "[Winner(s)]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf), "Winner: ");
         ADD_S_STRLEN(&(cur_c->write_buf), winner->nick);
         ADD_S(&(cur_c->write_buf), "\n");
@@ -1106,6 +1177,8 @@ void game_process_next_step(server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        add_msg_head(&(cur_c->write_buf),
+            "[Month completed]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf),
             "Yeah! All players completed this month!\n");
     }
