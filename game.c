@@ -788,11 +788,8 @@ void do_cmd_turn(server_info *sinfo, client_info *client)
         all_compl = all_compl &&
             (!cur_c->in_round || cur_c->step_completed);
 
-        if ((! cur_c->step_completed)
-            || cur_c == client)
-        {
+        if (cur_c == client)
             continue;
-        }
 
         add_msg_head(&(cur_c->write_buf),
             "[Turn]\n", MSG_ASYNC);
