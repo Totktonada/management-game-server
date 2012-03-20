@@ -598,6 +598,8 @@ void try_to_start_new_round(server_info *sinfo)
         return;
     }
 
+    new_game_data(sinfo);
+
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
         cur_c = cur_c->next)

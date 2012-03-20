@@ -262,7 +262,7 @@ request *get_request(request_group **group_pointer,
     if (prev_req == NULL) {
         group->first_req = req->next;
     } else {
-        prev_req = req->next;
+        prev_req->next = req->next;
     }
 
     --(group->req_count);
