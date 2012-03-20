@@ -123,13 +123,6 @@ typedef struct server_info {
     int max_clients; /* -1 is without limitation */
     time_t time_to_next_event;
     unsigned int backward_warnings_counter;
-    /* Prompt and time data.
-     * Prompt format:     "\n[%H:%M:%S] "
-     * Async. msg format: "\n<%H:%M:%S> "
-     * See update_time_buf() in utils.c
-     * for more information. */
-    char prefix_prompt[16];
-    char prefix_async_msg[16];
     /* Game data */
     int players_count;
     unsigned int in_round:1;
@@ -139,10 +132,17 @@ typedef struct server_info {
     request_group *sell_prod;
 } server_info;
 
+typedef enum msg_type {
+    MSG_RESPONCE,
+    MSG_ASYNC
+} msg_type;
+
 void mark_client_to_disconnect(client_info *client,
     disconnect_reasons reason);
 void process_end_round(server_info *sinfo);
 void try_to_deferred_start_round(server_info *sinfo);
+void add_msg_head(msg_buffer *write_buf,
+    char *head_str, msg_type type);
 
 #include "parameters.h"
 #include "game.h"

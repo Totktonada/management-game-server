@@ -25,8 +25,6 @@ typedef struct msg_buffer {
 void new_msg_buffer(msg_buffer *buf);
 int is_msg_buffer_empty(msg_buffer *buf);
 void replace_last_block_with_copy(msg_buffer *buf);
-void add_prefix_to_msg_buffer(msg_buffer *buf,
-    const char *prefix, unsigned int prefix_length);
 void add_str_to_msg_buffer(msg_buffer *buf,
     const char *str, unsigned int str_length);
 void add_number_to_msg_buffer(msg_buffer *buf,
@@ -39,12 +37,6 @@ void add_half_to_msg_buffer(msg_buffer *buf,
  * S - string;
  * N - number;
  * H - half of number; */
-
-#define ADD_PREFIX_STRLEN(buf, prefix) \
-do { \
-    add_prefix_to_msg_buffer(buf, prefix, \
-        strlen(prefix)); \
-} while (0)
 
 #define ADD_S(buf, s1) \
 do { \

@@ -78,7 +78,7 @@ unsigned int log10i(unsigned int number)
  * On fail place "\n" to strbuf. Real buffer size
  * must be >= 2 (for avoid segfault). */
 void update_time_buf(char *time_buf, int buf_size,
-    prefix_type type)
+    time_buf_type type)
 {
     time_t unix_time;
     struct tm *localtime_var;
@@ -93,10 +93,10 @@ void update_time_buf(char *time_buf, int buf_size,
         ok = 0;
     }
 
-    if (ok && (type == PREFIX_PROMPT)) {
+    if (ok && (type == TIME_BUF_PROMPT)) {
         strftime_value = strftime(time_buf, buf_size,
             "\n[%H:%M:%S] ", localtime_var);
-    } else if (ok && (type == PREFIX_ASYNC_MSG)) {
+    } else if (ok && (type == TIME_BUF_ASYNC_MSG)) {
         strftime_value = strftime(time_buf, buf_size,
             "\n<%H:%M:%S> ", localtime_var);
     } else {

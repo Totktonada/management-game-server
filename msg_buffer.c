@@ -59,24 +59,6 @@ msg_block *new_number_msg_block(const int number, int *str_length)
     return new_msg_block;
 }
 
-void add_prefix_to_msg_buffer(msg_buffer *buf, const char *prefix,
-    unsigned int prefix_length)
-{
-    msg_block *tmp_block;
-
-    if (buf->first_block == NULL) {
-        buf->last_block = buf->first_block =
-            new_str_msg_block(prefix, prefix_length);
-    } else {
-        tmp_block =
-            new_str_msg_block(prefix, prefix_length);
-        tmp_block->next = buf->first_block;
-        buf->first_block = tmp_block;
-    }
-
-    buf->common_length += prefix_length;
-}
-
 void add_str_to_msg_buffer(msg_buffer *buf, const char *str,
     unsigned int str_length)
 {

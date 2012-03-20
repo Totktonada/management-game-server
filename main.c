@@ -1,12 +1,34 @@
 #include "main.h"
 
-void print_prompt(server_info *sinfo, client_info *client)
+/* Prompt format: "\n[%H:%M:%S] "
+ * See update_time_buf() in utils.c
+ * for more information. */
+void add_prompt(client_info *client)
 {
-    update_time_buf(sinfo->prefix_prompt,
-        sizeof(sinfo->prefix_prompt), PREFIX_PROMPT);
-    ADD_S_STRLEN(&(client->write_buf), sinfo->prefix_prompt);
+    char prompt[TIME_BUFFER_SIZE]; /* TODO: static? */
+
+    update_time_buf(prompt, sizeof(prompt), TIME_BUF_PROMPT);
+    ADD_S_STRLEN_MAKE_COPY(&(client->write_buf), prompt);
     ADD_S_STRLEN(&(client->write_buf), client->nick);
     ADD_S(&(client->write_buf), " $ ");
+}
+
+/* Async. msg format: "\n<%H:%M:%S> "
+ * See update_time_buf() in utils.c
+ * for more information. */
+void add_msg_head(msg_buffer *write_buf, char *head_str,
+    msg_type type)
+{
+    char head_async_msg[TIME_BUFFER_SIZE]; /* TODO: static? */
+
+    if (type == MSG_ASYNC) {
+        update_time_buf(head_async_msg,
+            sizeof(head_async_msg), TIME_BUF_ASYNC_MSG);
+        ADD_S_STRLEN_MAKE_COPY(write_buf, head_async_msg);
+    }
+
+    /* TODO: remove strlen. */
+    ADD_S_STRLEN(write_buf, head_str);
 }
 
 void notify_client_about_disconnect_reason(client_info *client)
@@ -14,6 +36,8 @@ void notify_client_about_disconnect_reason(client_info *client)
     if (! client->connected)
         return;
 
+    add_msg_head(&(client->write_buf),
+        "[Disconnecting]\n", MSG_RESPONCE);
     ADD_S(&(client->write_buf), "Disconnecting... Reason: ");
 
     switch (client->reason) {
@@ -44,6 +68,8 @@ void notify_all_clients_about_disconnect(const server_info *sinfo,
         if (cur_c == client)
             continue;
 
+        add_msg_head(&(cur_c->write_buf),
+            "[Disconnecting]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf), "Client ");
         ADD_S_STRLEN(&(cur_c->write_buf), client->nick);
         ADD_S(&(cur_c->write_buf), " disconnected.\nReason: ");
@@ -175,6 +201,8 @@ void warn_all(server_info *sinfo)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        add_msg_head(&(cur_c->write_buf),
+            "[Rounds]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf),
 "Time remaining to the next game round: ");
         ADD_N(&(cur_c->write_buf), remain_time);
@@ -192,7 +220,7 @@ You can do it by join command (see \"help join\").\n");
     --(sinfo->backward_warnings_counter);
 }
 
-void notify_all(server_info *sinfo, const char *msg)
+void notify_all_round_countdown_cancel(server_info *sinfo)
 {
     client_info *cur_c;
 
@@ -200,8 +228,28 @@ void notify_all(server_info *sinfo, const char *msg)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        ADD_S_STRLEN(&(cur_c->write_buf), msg);
-        /* TODO: remove strlen. */
+        add_msg_head(&(cur_c->write_buf),
+            "[Rounds]\n", MSG_ASYNC);
+        ADD_S(&(cur_c->write_buf),
+"Time countdown for a next round can not be\n\
+started because count of clients less then two.\n");
+    }
+}
+
+void notify_all_round_less_two_players(server_info *sinfo)
+{
+    client_info *cur_c;
+
+    for (cur_c = sinfo->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        add_msg_head(&(cur_c->write_buf),
+            "[Rounds]\n", MSG_ASYNC);
+        ADD_S(&(cur_c->write_buf),
+"Round can not be started because count of\n\
+clients, which send request for participating\n\
+in game round, less then two.\n");
     }
 }
 
@@ -222,9 +270,7 @@ void try_to_stop_deferred_start_round(server_info *sinfo)
     if (sinfo->clients_count <= 1) {
         sinfo->time_to_next_event = -1;
         sinfo->backward_warnings_counter = 0;
-        notify_all(sinfo,
-"Round can not be started because count of clients\n\
-less then two.\n");
+        notify_all_round_countdown_cancel(sinfo);
     }
 }
 
@@ -272,6 +318,7 @@ void try_to_unregister_client(server_info *sinfo, client_info *client)
     }
 }
 
+#if 0
 /* TODO: maybe add prompt to end? */
 void add_async_prefixes(server_info *sinfo, client_info *client)
 {
@@ -291,13 +338,14 @@ void add_async_prefixes(server_info *sinfo, client_info *client)
 
         /* Add prefix for asynchronous messages. */
         if (cur_c != client) {
-            update_time_buf(sinfo->prefix_async_msg,
-                sizeof(sinfo->prefix_async_msg), PREFIX_ASYNC_MSG);
+            update_time_buf(sinfo->head_async_msg,
+                sizeof(sinfo->head_async_msg), TIME_BUF_ASYNC_MSG);
             ADD_PREFIX_STRLEN(&(cur_c->write_buf),
-                sinfo->prefix_async_msg);
+                sinfo->head_async_msg);
         }
     }
 }
+#endif
 
 /* TODO: use select */
 void write_buffers_all_clients(server_info *sinfo)
@@ -328,7 +376,9 @@ void try_to_disconnect(server_info *sinfo, client_info *client)
 
     notify_client_about_disconnect_reason(client);
     notify_all_clients_about_disconnect(sinfo, client);
+#if 0
     add_async_prefixes(sinfo, client);
+#endif
     write_msg_buffer(&(client->write_buf), client->fd);
 
     try_to_unregister_client(sinfo, client);
@@ -395,6 +445,8 @@ void notify_client_connected(server_info *sinfo,
         if (cur_c->in_round)
             continue;
 
+        add_msg_head(&(cur_c->write_buf),
+            "[Connected]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf),
             "Connected new client. Username: ");
         ADD_S_STRLEN(&(cur_c->write_buf), new_client->nick);
@@ -431,7 +483,9 @@ void process_new_client(server_info *sinfo, int listening_socket)
     ++(sinfo->clients_count);
     new_client->nick = first_vacant_nick(sinfo->first_client);
     notify_client_connected(sinfo, new_client);
+#if 0
     add_async_prefixes(sinfo, new_client);
+#endif
 
     if (sinfo->first_client == NULL) {
         sinfo->last_client = sinfo->first_client = new_client;
@@ -445,7 +499,7 @@ void process_new_client(server_info *sinfo, int listening_socket)
     }
 
     try_to_deferred_start_round(sinfo);
-    print_prompt(sinfo, new_client);
+    add_prompt(new_client);
 }
 
 void process_end_round(server_info *sinfo)
@@ -488,8 +542,10 @@ void process_readed_data(server_info *sinfo, client_info *client)
 #endif
         destroy_str = execute_cmd(sinfo, client, cmd);
         destroy_cmd(cmd, destroy_str);
+#if 0
         add_async_prefixes(sinfo, client);
-        print_prompt(sinfo, client);
+#endif
+        add_prompt(client);
     } while (1);
 }
 
@@ -533,10 +589,7 @@ void try_to_start_new_round(server_info *sinfo)
     sinfo->backward_warnings_counter = 0;
 
     if (sinfo->players_count <= 1) {
-        notify_all(sinfo,
-"Round can not be started because count of\n\
-clients, which send request for participating\n\
-in game round, less then two.\n");
+        notify_all_round_less_two_players(sinfo);
         try_to_deferred_start_round(sinfo);
         return;
     }
@@ -545,6 +598,9 @@ in game round, less then two.\n");
         cur_c != NULL;
         cur_c = cur_c->next)
     {
+        add_msg_head(&(cur_c->write_buf),
+            "[Rounds]\n", MSG_ASYNC);
+
         if (cur_c->want_to_next_round) {
             cur_c->in_round = 1;
             cur_c->want_to_next_round = 0;
@@ -570,8 +626,9 @@ void process_time_events(server_info *sinfo)
         /* sinfo->backward_warnings_counter == 0 */
         try_to_start_new_round(sinfo);
     }
-
+#if 0
     add_async_prefixes(sinfo, NULL);
+#endif
 }
 
 #ifdef DAEMON_ALT
