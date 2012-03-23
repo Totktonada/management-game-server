@@ -355,7 +355,7 @@ void do_cmd_nick(server_info *sinfo, client_info *client, char *nick)
     client_info *cur_c;
 
     add_msg_head(&(client->write_buf),
-        "[Username changing]\n", MSG_RESPONCE);
+        "[Nick]\n", MSG_RESPONCE);
 
     if (nick != NULL) {
         /* If starts with '-'. */
