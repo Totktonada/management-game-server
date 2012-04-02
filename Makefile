@@ -21,7 +21,9 @@ $(EXEC_FILE): $(OBJMODULES)
 	$(CC) $(CFLAGS) $^ -o $@
 
 ifneq (clean, $(MAKECMDGOALS))
+ifneq (clang_analyze_clean, $(MAKECMDGOALS))
 -include deps.mk
+endif
 endif
 
 deps.mk: $(SRCMODULES) $(HEADERS)
@@ -29,3 +31,6 @@ deps.mk: $(SRCMODULES) $(HEADERS)
 
 clean:
 	rm -f *.o $(EXEC_FILE) deps.mk *.core core
+
+clang_analyze_clean:
+	rm -f *.h.gch *.plist
