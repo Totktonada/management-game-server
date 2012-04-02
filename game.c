@@ -1110,11 +1110,11 @@ void write_all_winners(server_info *sinfo, msg_buffer *write_buf)
         ADD_S(write_buf, "\n");
 }
 
-/* Winner must be existent and single. */
+/* Print first player with positive money count. */
 void write_winner(server_info *sinfo)
 {
     client_info *cur_c;
-    client_info *winner;
+    client_info *winner = NULL;
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
@@ -1125,6 +1125,9 @@ void write_winner(server_info *sinfo)
             break;
         }
     }
+
+    if (winner == NULL)
+        return;
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;

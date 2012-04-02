@@ -294,7 +294,8 @@ void try_to_unregister_client(server_info *sinfo, client_info *client)
                 update_max_fd(sinfo);
             }
 
-            if (cur_c == sinfo->first_client)
+            /* if (cur_c == sinfo->first_client) */
+            if (prev_c == NULL)
                 sinfo->first_client = next_c;
             else
                 prev_c->next = next_c;
