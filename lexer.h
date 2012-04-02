@@ -1,9 +1,6 @@
 #ifndef LEXER_H_SENTRY
 #define LEXER_H_SENTRY
 
-/* For isblank() */
-#define _POSIX_C_SOURCE 200112L
-
 #include <limits.h>
 #include <ctype.h>
 #include <stdlib.h>

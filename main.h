@@ -1,9 +1,6 @@
 #ifndef MAIN_H_SENTRY
 #define MAIN_H_SENTRY
 
-/* For inet_aton() and daemon(). */
-#define _BSD_SOURCE
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>

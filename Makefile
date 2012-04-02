@@ -3,9 +3,13 @@ OBJMODULES = $(SRCMODULES:.c=.o)
 HEADERS = $(SRCMODULES:.c=.h)
 EXEC_FILE = management-game-server
 
-DEFINE =
+# _POSIX_C_SOURCE=200112L for isblank();
+# _BSD_SOURCE for inet_aton() and daemon().
+DEFINE = -D_POSIX_C_SOURCE=200112L -D_BSD_SOURCE
+
 #DEFINE = -DDAEMON # invoke daemon();
 #DEFINE = -DDAEMON -DDAEMON_ALT # invoke daemon_alt(); see main.c.
+
 CFLAGS = -g -Wall -ansi -pedantic $(DEFINE)
 
 default: $(EXEC_FILE)
