@@ -388,12 +388,12 @@ void try_to_disconnect(server_info *sinfo, client_info *client)
 
     try_to_unregister_client(sinfo, client);
 
-    if (SHUTDOWN_ERROR(
-        shutdown(client->fd, SHUT_RDWR)))
-    {
-        perror("shutdown()");
-        exit(ES_SYSCALL_FAILED);
-    }
+    /* shutdown(filedes, SHUT_RDWR) returns error,
+     * if socket has data, that not readed by client,
+     * but client is do reset connection (and
+     * possibly in other case). Therefore, shutdown
+     * fail must be ignored. */
+    shutdown(client->fd, SHUT_RDWR);
 
     client->connected = 0;
 
@@ -570,9 +570,17 @@ void read_ready_data(server_info *sinfo, fd_set *ready_fds)
 
         read_value = read(cur_c->fd, cur_c->read_buffer,
             sizeof(char) * READ_BUFFER_SIZE);
+
         if (READ_ERROR(read_value)) {
+            /* Read error is not fatal for server.
+             * For example read returns error, if
+             * client was unexpectedly terminated
+             * (sent a RST packet). */
+#ifndef DAEMON
             perror("read()");
-            exit(ES_SYSCALL_FAILED);
+#endif
+            cur_c->connected = 0;
+            mark_client_to_disconnect(cur_c, REASON_BY_CLIENT);
         } else if (READ_EOF(read_value)) {
             cur_c->connected = 0;
             mark_client_to_disconnect(cur_c, REASON_BY_CLIENT);

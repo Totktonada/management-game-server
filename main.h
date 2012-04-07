@@ -40,7 +40,6 @@
 #define SELECT_TIMEOUT(select_value) ((select_value) == 0)
 #define READ_ERROR(read_value) ((read_value) == -1)
 #define READ_EOF(read_value) ((read_value) == 0)
-#define SHUTDOWN_ERROR(shutdown_value) ((shutdown_value) == -1)
 #define CLOSE_ERROR(close_value) ((close_value) == -1)
 #define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 #define SETSID_ERROR(setsid_value) ((setsid_value) == -1)
