@@ -50,6 +50,7 @@ lexeme *new_lex(type_of_lex type, buffer *buf)
         } else {
             lex->value.number = (int) tmp_number;
         }
+        free(tmp_str);
         break;
     default:
         /* lex->value is undefined. */

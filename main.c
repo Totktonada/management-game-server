@@ -75,7 +75,7 @@ void notify_all_clients_about_disconnect(const server_info *sinfo,
         add_msg_head(&(cur_c->write_buf),
             "[Disconnecting]\n", MSG_ASYNC);
         ADD_S(&(cur_c->write_buf), "Client ");
-        ADD_S_STRLEN(&(cur_c->write_buf), client->nick);
+        ADD_S_STRLEN_MAKE_COPY(&(cur_c->write_buf), client->nick);
         ADD_S(&(cur_c->write_buf), " disconnected.\nReason: ");
 
         switch (client->reason) {
@@ -402,6 +402,7 @@ void try_to_disconnect(server_info *sinfo, client_info *client)
         exit(ES_SYSCALL_FAILED);
     }
 
+    free(client->nick);
     free(client);
 }
 

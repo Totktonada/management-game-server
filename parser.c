@@ -25,6 +25,7 @@ int parser_get_lex(parser_info *pinfo)
     if (pinfo->cur_lex != NULL)
         destroy_lex(pinfo->cur_lex, ! pinfo->cur_lex_data_used);
 
+    pinfo->cur_lex_data_used = 0;
     pinfo->cur_lex = get_lex(&(pinfo->linfo));
 
     if (pinfo->cur_lex == NULL) {
