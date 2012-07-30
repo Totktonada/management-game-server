@@ -198,8 +198,8 @@ void mark_client_to_disconnect(client_info *client,
 void warn_all(server_info *sinfo)
 {
     client_info *cur_c;
-    unsigned int remain_time =
-        sinfo->backward_warnings_counter * TIME_BETWEEN_TIME_EVENTS;
+    unsigned int remain_time = sinfo->backward_warnings_counter
+        * sinfo->time_between_time_events;
 
     for (cur_c = sinfo->first_client;
         cur_c != NULL;
@@ -263,7 +263,7 @@ void try_to_deferred_start_round(server_info *sinfo)
         && (sinfo->time_to_next_event < 0)
         && (sinfo->clients_count > 1))
     {
-        sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
+        sinfo->time_to_next_event = sinfo->time_between_time_events;
         sinfo->backward_warnings_counter = WARNINGS_BEFORE_ROUND;
         warn_all(sinfo);
     }
@@ -636,7 +636,7 @@ void try_to_start_new_round(server_info *sinfo)
 void process_time_events(server_info *sinfo)
 {
     if (sinfo->backward_warnings_counter > 0) {
-        sinfo->time_to_next_event = TIME_BETWEEN_TIME_EVENTS;
+        sinfo->time_to_next_event = sinfo->time_between_time_events;
         warn_all(sinfo);
     } else {
         /* sinfo->backward_warnings_counter == 0 */

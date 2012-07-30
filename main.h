@@ -17,7 +17,6 @@
 
 #define DEFAULT_LISTENING_PORT 37187
 #define READ_BUFFER_SIZE 1024
-#define TIME_BETWEEN_TIME_EVENTS 10
 #define WARNINGS_BEFORE_ROUND 6
 
 #include "parser.h"
@@ -117,6 +116,7 @@ typedef struct server_info {
     client_info *last_client;
     int clients_count;
     int max_clients; /* -1 is without limitation */
+    time_t time_between_time_events;
     time_t time_to_next_event;
     unsigned int backward_warnings_counter;
     /* Game data */

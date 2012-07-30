@@ -17,6 +17,7 @@ typedef enum parameters_parser_state {
     PARAM_P_ST_IP,
     PARAM_P_ST_PORT,
     PARAM_P_ST_MAX,
+    PARAM_P_ST_TIME,
     PARAM_P_ST_ERROR
 } parameters_parser_state;
 
