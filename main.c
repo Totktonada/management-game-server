@@ -720,7 +720,11 @@ int main(int argc, char **argv, char **envp)
                 NULL, NULL, NULL);
         } else {
             tv.tv_sec = sinfo.time_to_next_event;
-            tv.tv_usec = 0;
+            if (tv.tv_sec == 0)
+                /* For avoid high network loading. */
+                tv.tv_usec = 100000; /* 0.1 seconds */
+            else
+                tv.tv_usec = 0;
             time(&delta_time);
             select_value = select(sinfo.max_fd + 1, &ready_fds,
                 NULL, NULL, &tv);

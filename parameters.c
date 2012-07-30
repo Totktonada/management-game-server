@@ -60,7 +60,9 @@ void process_cmd_line_parameters(server_info *sinfo, char **argv)
             break;
         case PARAM_P_ST_TIME:
             sinfo->time_between_time_events = atoi(*argv);
-            if (sinfo->time_between_time_events == 0) {
+            if (sinfo->time_between_time_events == 0
+                && !STR_EQUAL(*argv, "0"))
+            {
                 state = PARAM_P_ST_ERROR;
             } else {
                 state = PARAM_P_ST_START;
