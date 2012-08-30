@@ -1,35 +1,14 @@
 #ifndef PARSER_H_SENTRY
 #define PARSER_H_SENTRY
 
-#include <strings.h>
-#ifndef DAEMON
-#include <stdio.h>
-#endif
 #include "lexer.h"
+#include "typedefs.h"
 
-typedef enum type_of_cmd {
-    CMD_EMPTY,  /* '\n' */
-    CMD_HELP,   /* help [command] */
-    CMD_NICK,   /* nick [string] */
-    CMD_STATUS, /* status [username |
-        --all | -a | --market | -m |
-        --players | -p | --server | -s] */
-    CMD_BUILD,  /* build count */
-    CMD_MAKE,   /* make count */
-    CMD_BUY,    /* buy count cost */
-    CMD_SELL,   /* sell count cost */
-    CMD_TURN,   /* turn */
-    CMD_JOIN,   /* join */
-    CMD_WRONG,
-    CMD_PROTOCOL_PARSE_ERROR
-} type_of_cmd;
-
-/* TODO: move this fields to parser_info. */
-typedef struct command {
-    type_of_cmd type;
+typedef struct command_t {
+    command_kind type;
     value_of_lex value;
     value_of_lex value2;
-} command;
+} command_t;
 
 typedef enum parser_state {
     P_ST_START,
@@ -46,21 +25,22 @@ typedef enum parser_state {
     P_ST_PROTOCOL_PARSE_ERROR
 } parser_state;
 
-typedef struct parser_info {
+typedef struct parser_t {
     parser_state state;
-    lexer_info linfo;
+    lexer_t lexer;
     lexeme *cur_lex;
-    command tmp_cmd;
-    unsigned int request_for_lex:1;
-    unsigned int cur_lex_data_used:1;
-} parser_info;
+    command_t tmp_cmd;
+    uint request_for_lex:1;
+    uint cur_lex_data_used:1;
+} parser_t;
 
-#include "utils.h"
+void new_parser(parser_t *parser);
 
-void new_parser_info(parser_info *pinfo);
-void put_new_data_to_parser(parser_info *pinfo,
+void put_new_data_to_parser(parser_t *parser,
     char *read_buffer, int read_available);
-command *get_cmd(parser_info *pinfo);
-void destroy_cmd(command *cmd, int destroy_str);
+
+command_t *get_command(parser_t *parser);
+
+void destroy_command(command_t *cmd);
 
 #endif

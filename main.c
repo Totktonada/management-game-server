@@ -1,124 +1,50 @@
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/select.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <time.h>
+
 #include "main.h"
+#include "arguments.h"
+#include "commands.h"
+#include "end_month.h"
+#include "messages.h"
+#include "utils.h"
+#include "game.h"
+#include "expire.h"
+#include "notifications.h"
 
-/* Prompt format: "\n[%H:%M:%S] "
- * See update_time_buf() in utils.c
- * for more information. */
-void add_prompt(client_info *client)
-{
-    char prompt[TIME_BUFFER_SIZE]; /* TODO: static? */
-
-    update_time_buf(prompt, sizeof(prompt),
-        TIME_BUF_PROMPT_AND_RESPONCE);
-    ADD_S_STRLEN_MAKE_COPY(&(client->write_buf), prompt);
-    ADD_S_STRLEN(&(client->write_buf), client->nick);
-    ADD_S(&(client->write_buf), " $ ");
-}
-
-/* Async. msg format: "\n<%H:%M:%S> "
- * See update_time_buf() in utils.c
- * for more information. */
-void add_msg_head(msg_buffer *write_buf, char *head_str,
-    msg_type type)
-{
-    char time_buf[TIME_BUFFER_SIZE]; /* TODO: static? */
-
-    if (type == MSG_ASYNC) {
-        update_time_buf(time_buf,
-            sizeof(time_buf), TIME_BUF_ASYNC_MSG);
-    } else { /* type == MSG_RESPONCE */
-        update_time_buf(time_buf,
-            sizeof(time_buf), TIME_BUF_PROMPT_AND_RESPONCE);
-    }
-
-    ADD_S_STRLEN_MAKE_COPY(write_buf, time_buf);
-    /* TODO: remove strlen. */
-    ADD_S_STRLEN(write_buf, head_str);
-}
-
-void notify_client_about_disconnect_reason(client_info *client)
-{
-    if (! client->connected)
-        return;
-
-    add_msg_head(&(client->write_buf),
-        "[Disconnecting]\n", MSG_RESPONCE);
-    ADD_S(&(client->write_buf), "Disconnecting... Reason: ");
-
-    switch (client->reason) {
-    case REASON_SERVER_FULL:
-        ADD_S(&(client->write_buf), "server full.\n");
-        break;
-    case REASON_BY_CLIENT:
-        /* Not possible. */
-        break;
-    case REASON_PROTOCOL_PARSE_ERROR:
-        ADD_S(&(client->write_buf), "protocol parse error.\n");
-        break;
-    }
-}
-
-void notify_all_clients_about_disconnect(const server_info *sinfo,
-    client_info *client)
-{
-    client_info *cur_c;
-
-    if (client->reason == REASON_SERVER_FULL)
-        return;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        if (cur_c == client)
-            continue;
-
-        add_msg_head(&(cur_c->write_buf),
-            "[Disconnecting]\n", MSG_ASYNC);
-        ADD_S(&(cur_c->write_buf), "Client ");
-        ADD_S_STRLEN_MAKE_COPY(&(cur_c->write_buf), client->nick);
-        ADD_S(&(cur_c->write_buf), " disconnected.\nReason: ");
-
-        switch (client->reason) {
-        case REASON_SERVER_FULL:
-            /* Not possible. */
-            break;
-        case REASON_BY_CLIENT:
-            ADD_S(&(cur_c->write_buf),
-                "connection closed by client.\n");
-            break;
-        case REASON_PROTOCOL_PARSE_ERROR:
-            ADD_S(&(cur_c->write_buf),
-                "protocol parse error.\n");
-            break;
-        }
-    }
-}
-
-/* On success set sinfo->listening_socket
- * to proper value.
- * Exit on failure. */
-void get_listening_socket(server_info *sinfo)
+/* On success return listening socket. Exit on failure. */
+static int get_listening_socket(const char *server_ip, uint server_port)
 {
     struct sockaddr_in addr;
     int so_reuseaddr_value = 1;
+    int listening_socket = socket(AF_INET, SOCK_STREAM, 0);
 
-    sinfo->listening_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (SOCKET_ERROR(sinfo->listening_socket)) {
+    if (SOCKET_ERROR(listening_socket)) {
         perror("socket()");
         exit(ES_SYSCALL_FAILED);
     }
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(sinfo->listening_port);
+    addr.sin_port = htons(server_port);
     /* addr.sin_addr.s_addr = INADDR_ANY; */
     if (INET_ATON_ERROR(
-            inet_aton(sinfo->server_ip, &(addr.sin_addr))))
+            inet_aton(server_ip, &(addr.sin_addr))))
     {
         perror("inet_aton()");
         exit(ES_SYSCALL_FAILED);
     }
 
-    if (SETSOCKOPT(setsockopt(sinfo->listening_socket,
+    if (SETSOCKOPT(setsockopt(listening_socket,
             SOL_SOCKET, SO_REUSEADDR, &so_reuseaddr_value,
             sizeof(so_reuseaddr_value))))
     {
@@ -126,267 +52,178 @@ void get_listening_socket(server_info *sinfo)
         exit(ES_SYSCALL_FAILED);
     }
 
-    if (BIND_ERROR(bind(sinfo->listening_socket,
+    if (BIND_ERROR(bind(listening_socket,
             (struct sockaddr *) &addr, sizeof(addr))))
     {
         perror("bind()");
         exit(ES_SYSCALL_FAILED);
     }
 
-    if (LISTEN_ERROR(listen(sinfo->listening_socket, 5))) {
+    if (LISTEN_ERROR(listen(listening_socket, 5))) {
         perror("listen()");
         exit(ES_SYSCALL_FAILED);
     }
+
+    return listening_socket;
 }
 
-void update_max_fd(server_info *sinfo)
+static void update_max_fd(server_t *server)
 {
-    client_info *cur_client;
+    client_t *cur_client;
 
-    sinfo->max_fd = sinfo->listening_socket;
+    server->max_fd = server->listening_socket;
 
-    for (cur_client = sinfo->first_client;
+    for (cur_client = server->first_client;
         cur_client != NULL;
         cur_client = cur_client->next)
     {
-        if (sinfo->max_fd < cur_client->fd)
-            sinfo->max_fd = cur_client->fd;
+        if (server->max_fd < cur_client->fd) {
+            server->max_fd = cur_client->fd;
+        }
     }
 }
 
-client_info *new_client_info(int client_socket)
+static void game_over(server_t *server)
 {
-    client_info *client = (client_info *)
-        malloc(sizeof(client_info));
+    client_t *cur_c;
+
+    msg_round_over_clients(server);
+
+    free(server->game->players);
+    free(server->game);
+    server->game = NULL;
+
+    for (cur_c = server->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        if (cur_c->player) {
+            free(cur_c->player);
+            cur_c->player = NULL;
+        }
+    }
+}
+
+static client_t *new_client(int client_socket)
+{
+    client_t *client = (client_t *) malloc(sizeof(client_t));
+
     client->next = NULL;
     client->nick = NULL;
     client->fd = client_socket;
     client->connected = 0;
-    client->to_disconnect = 0;
-    /* client->reason is undefined when (client->to_disconnect == 0) */
-    client->in_round = 0;
-    client->want_to_next_round = 0;
+
     /* client->read_buffer now exist, it is okay */
     client->read_available = 0;
-    new_parser_info(&(client->pinfo));
-    new_msg_buffer(&(client->write_buf));
-    new_client_game_data(client);
+    new_parser(&(client->parser));
+
+    msg_buffer_new(&(client->write_buf));
+
+    client->player = NULL;
+
+    client->to_disconnect = 0;
+    /* client->reason is undefined when (client->to_disconnect == 0) */
+    client->want_to_next_round = 0;
+
     return client;
 }
 
 /* Get listening socket and put it to read_fds.
  * Note: no malloc */
-void init_server_info(server_info *sinfo)
+static void new_server(server_t *server, const char *server_ip,
+    uint server_port)
 {
-    get_listening_socket(sinfo);
-    FD_ZERO(&(sinfo->read_fds));
-    FD_SET(sinfo->listening_socket, &(sinfo->read_fds));
-    sinfo->first_client = NULL;
-    update_max_fd(sinfo);
-    sinfo->clients_count = 0;
-    new_game_data(sinfo);
-    process_end_round(sinfo);
-}
+    server->state = ST_SERVER_START;
 
-void mark_client_to_disconnect(client_info *client,
-    disconnect_reasons reason)
-{
-    client->to_disconnect = 1;
-    client->reason = reason;
-}
+    server->first_client = NULL;
+    server->last_client = NULL;
+    server->clients_count = 0;
 
-void warn_all(server_info *sinfo)
-{
-    client_info *cur_c;
-    unsigned int remain_time = sinfo->backward_warnings_counter
-        * sinfo->time_between_time_events;
+    /* Set listening_socket. */
+    server->listening_socket =
+        get_listening_socket(server_ip, server_port);
 
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        add_msg_head(&(cur_c->write_buf),
-            "[Rounds]\n", MSG_ASYNC);
-        ADD_S(&(cur_c->write_buf),
-"Time remaining to the next game round: ");
-        ADD_N(&(cur_c->write_buf), remain_time);
-        ADD_S(&(cur_c->write_buf), " (sec)\n");
-        if (cur_c->want_to_next_round) {
-            ADD_S(&(cur_c->write_buf),
-"Your request to participating in next game round is stored.\n");
-        } else {
-            ADD_S(&(cur_c->write_buf),
-"You *not* send request for participating in this round.\n\
-You can do it by join command (see \"help join\").\n");
-        }
-    }
+    /* Set read_fds. */
+    FD_ZERO(&(server->read_fds));
+    FD_SET(server->listening_socket, &(server->read_fds));
 
-    --(sinfo->backward_warnings_counter);
-}
+    /* Set max_fd. */
+    update_max_fd(server);
 
-void notify_all_round_countdown_cancel(server_info *sinfo)
-{
-    client_info *cur_c;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        add_msg_head(&(cur_c->write_buf),
-            "[Rounds]\n", MSG_ASYNC);
-        ADD_S(&(cur_c->write_buf),
-"Time countdown for a next round can not be\n\
-started because count of clients less then two.\n");
-    }
-}
-
-void notify_all_round_less_two_players(server_info *sinfo)
-{
-    client_info *cur_c;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        add_msg_head(&(cur_c->write_buf),
-            "[Rounds]\n", MSG_ASYNC);
-        ADD_S(&(cur_c->write_buf),
-"Round can not be started because count of\n\
-clients, which send request for participating\n\
-in game round, less then two.\n");
-    }
-}
-
-void try_to_deferred_start_round(server_info *sinfo)
-{
-    if (!sinfo->in_round
-        && (sinfo->time_to_next_event < 0)
-        && (sinfo->clients_count > 1))
-    {
-        sinfo->time_to_next_event = sinfo->time_between_time_events;
-        sinfo->backward_warnings_counter = WARNINGS_BEFORE_ROUND;
-        warn_all(sinfo);
-    }
-}
-
-void try_to_stop_deferred_start_round(server_info *sinfo)
-{
-    if (sinfo->clients_count <= 1) {
-        sinfo->time_to_next_event = -1;
-        sinfo->backward_warnings_counter = 0;
-        notify_all_round_countdown_cancel(sinfo);
-    }
+    server->game = NULL;
 }
 
 /* Remove client from our structures (if it contain this client). */
-void try_to_unregister_client(server_info *sinfo, client_info *client)
+static void try_to_unregister_client(server_t *server, client_t *client)
 {
-    client_info *prev_c = NULL;
-    client_info *cur_c = sinfo->first_client;
-    client_info *next_c = NULL;
+    client_t *prev_c = NULL;
+    client_t *cur_c = server->first_client;
+    client_t *next_c = NULL;
 
     while (cur_c != NULL) {
         next_c = cur_c->next;
 
-        if (cur_c == client) {
-            FD_CLR(client->fd, &(sinfo->read_fds));
-            if (sinfo->max_fd == client->fd) {
-                update_max_fd(sinfo);
-            }
-
-            /* if (cur_c == sinfo->first_client) */
-            if (prev_c == NULL)
-                sinfo->first_client = next_c;
-            else
-                prev_c->next = next_c;
-
-            if (cur_c == sinfo->last_client)
-                sinfo->last_client = prev_c;
-
-            --(sinfo->clients_count);
-            if (cur_c->in_round) {
-                /* TODO: maybe separate message for players. */
-                --(sinfo->players_count);
-                if (sinfo->players_count <= 1) {
-                    process_end_round(sinfo);
-                    try_to_deferred_start_round(sinfo);
-                }
-            }
-            if (! sinfo->in_round) {
-                try_to_stop_deferred_start_round(sinfo);
-            }
-            break;
-        }
-
-        prev_c = cur_c;
-        cur_c = next_c;
-    }
-}
-
-#if 0
-/* TODO: maybe add prompt to end? */
-void add_async_prefixes(server_info *sinfo, client_info *client)
-{
-    client_info *cur_c;
-
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-#if 0
-        /* TODO: Necessary? */
-        if (! cur_c->connected)
-            continue;
-#endif
-        if (is_msg_buffer_empty(&(cur_c->write_buf)))
-            continue;
-
-        /* Add prefix for asynchronous messages. */
         if (cur_c != client) {
-            update_time_buf(sinfo->head_async_msg,
-                sizeof(sinfo->head_async_msg), TIME_BUF_ASYNC_MSG);
-            ADD_PREFIX_STRLEN(&(cur_c->write_buf),
-                sinfo->head_async_msg);
+            prev_c = cur_c;
+            cur_c = next_c;
+            continue;
         }
+
+        FD_CLR(client->fd, &(server->read_fds));
+        if (server->max_fd == client->fd) {
+            update_max_fd(server);
+        }
+
+        /* if (cur_c == server->first_client) */
+        if (prev_c == NULL)
+            server->first_client = next_c;
+        else
+            prev_c->next = next_c;
+
+        if (cur_c == server->last_client)
+            server->last_client = prev_c;
+
+        --(server->clients_count);
+        break;
+        /* Game related code see in 'disconnect' func. */
     }
 }
-#endif
 
 /* TODO: use select */
-void write_buffers_all_clients(server_info *sinfo)
+static void write_buffers_all_clients(server_t *server)
 {
-    client_info *cur_c;
+    client_t *cur_c;
 
-    for (cur_c = sinfo->first_client;
+    for (cur_c = server->first_client;
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-#if 0
-        /* TODO: Necessary? */
         if (! cur_c->connected)
             continue;
-#endif
-        if (is_msg_buffer_empty(&(cur_c->write_buf)))
-            continue;
 
-        write_msg_buffer(&(cur_c->write_buf), cur_c->fd);
+        msg_buffer_write(&(cur_c->write_buf), cur_c->fd);
     }
 }
 
 /* Disconnect client. */
-void try_to_disconnect(server_info *sinfo, client_info *client)
+static void disconnect(server_t *server, client_t *client)
 {
     if (! client->to_disconnect)
         return;
 
-    notify_client_about_disconnect_reason(client);
-    notify_all_clients_about_disconnect(sinfo, client);
-#if 0
-    add_async_prefixes(sinfo, client);
-#endif
-    write_msg_buffer(&(client->write_buf), client->fd);
+    if (client->connected) {
+        msg_buffer_write(&(client->write_buf), client->fd);
+    } else {
+        msg_buffer_clear(&(client->write_buf));
+    }
 
-    try_to_unregister_client(sinfo, client);
+    try_to_unregister_client(server, client);
+
+    /* ==== Game related code ==== */
+    if (client->player) {
+        player_to_client(server->game, client);
+    }
+    /* =========================== */
 
     /* shutdown(filedes, SHUT_RDWR) returns error,
      * if socket has data, that not readed by client,
@@ -406,159 +243,98 @@ void try_to_disconnect(server_info *sinfo, client_info *client)
     free(client);
 }
 
-char *first_vacant_nick(client_info *first_client)
+static void process_disconnected(server_t *server)
 {
-    /* Why 12? See comment to number_to_str().
-     * First position reserved for 'p' symbol. */
-    char *buf = (char *) malloc(12 * sizeof(char));
-    client_info *cur_c;
-    int nick_number = 0;
-    int nick_found;
+    client_t *cur_c = server->first_client;
+    client_t *next_c = NULL;
 
-    *buf = 'p';
+    while (cur_c != NULL) {
+        next_c = cur_c->next;
 
-    do {
-        nick_found = 0;
-        cur_c = first_client;
-        number_to_str(buf + 1, nick_number);
-
-        while (cur_c != NULL && !nick_found) {
-            if (cur_c->nick == NULL) {
-                nick_found = 0;
-            } else {
-                nick_found = STR_EQUAL(buf,
-                    cur_c->nick);
-            }
-            cur_c = cur_c->next;
+        if (cur_c->to_disconnect) {
+            msg_disconnecting_clients(server, cur_c->nick,
+                get_reason_string(cur_c->reason));
+            disconnect(server, cur_c);
         }
 
-        ++nick_number;
-    } while (nick_found);
-
-    return buf;
-}
-
-void notify_client_connected(server_info *sinfo,
-    client_info *new_client)
-{
-    client_info *cur_c;
-
-    /* Messages for all clients. */
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        if (cur_c->in_round)
-            continue;
-
-        add_msg_head(&(cur_c->write_buf),
-            "[Connected]\n", MSG_ASYNC);
-        ADD_S(&(cur_c->write_buf),
-            "Connected new client. Username: ");
-        ADD_S_STRLEN(&(cur_c->write_buf), new_client->nick);
-        ADD_S(&(cur_c->write_buf), "\n");
-
-        ADD_SNS(&(cur_c->write_buf),
-            "Total connected clients: ",
-            sinfo->clients_count, "\n");
+        cur_c = next_c;
     }
 }
 
-/* Add new client to our structures.
- * Exit on failure. */
-void process_new_client(server_info *sinfo, int listening_socket)
+/* Add new client to our structures. Exit on failure. */
+static void process_new_client(server_t *server, uint max_clients)
 {
     /* We not save information about client IP and port. */
-    int client_socket = accept(listening_socket, NULL, NULL);
-    client_info *new_client;
+    int client_socket = accept(server->listening_socket, NULL, NULL);
+    client_t *new_c;
 
     if (ACCEPT_ERROR(client_socket)) {
         perror("accept()");
         exit(ES_SYSCALL_FAILED);
     }
 
-    new_client = new_client_info(client_socket);
-    new_client->connected = 1;
+    new_c = new_client(client_socket);
+    new_c->connected = 1;
 
-    if (sinfo->clients_count == sinfo->max_clients) {
-        mark_client_to_disconnect(new_client, REASON_SERVER_FULL);
-        try_to_disconnect(sinfo, new_client);
+    if (server->clients_count == max_clients) {
+        new_c->to_disconnect = 1;
+        new_c->reason = REASON_SERVER_FULL;
+        msg_first_message(&(new_c->write_buf));
+        msg_early_disconnecting(&(new_c->write_buf),
+            get_reason_string(new_c->reason));
+        disconnect(server, new_c);
         return;
     }
 
-    ++(sinfo->clients_count);
-    new_client->nick = first_vacant_nick(sinfo->first_client);
-    notify_client_connected(sinfo, new_client);
-#if 0
-    add_async_prefixes(sinfo, new_client);
-#endif
+    ++(server->clients_count);
+    new_c->nick = first_vacant_nick(server->first_client);
+    msg_info_clients(server, "New client: %s", new_c->nick);
 
-    if (sinfo->first_client == NULL) {
-        sinfo->last_client = sinfo->first_client = new_client;
+    if (server->first_client == NULL) {
+        server->last_client = server->first_client = new_c;
     } else {
-        sinfo->last_client = sinfo->last_client->next = new_client;
+        server->last_client = server->last_client->next = new_c;
     }
 
-    FD_SET(client_socket, &(sinfo->read_fds));
-    if (sinfo->max_fd < client_socket) {
-        sinfo->max_fd = client_socket;
+    FD_SET(client_socket, &(server->read_fds));
+    if (server->max_fd < client_socket) {
+        server->max_fd = client_socket;
     }
 
-    try_to_deferred_start_round(sinfo);
-    add_prompt(new_client);
+    msg_first_message(&(new_c->write_buf));
+    msg_prompt(&(new_c->write_buf));
 }
 
-void process_end_round(server_info *sinfo)
+static void process_readed_data(server_t *server, client_t *client)
 {
-    client_info *cur_c;
+    command_t *cmd;
 
-    for (cur_c = sinfo->first_client;
-        cur_c != NULL;
-        cur_c = cur_c->next)
-    {
-        cur_c->in_round = 0;
-    }
-
-    sinfo->players_count = 0;
-    sinfo->in_round = 0;
-    sinfo->time_to_next_event = -1;
-    sinfo->backward_warnings_counter = 0;
-}
-
-void process_readed_data(server_info *sinfo, client_info *client)
-{
-    command *cmd;
-    int destroy_str;
-
-    put_new_data_to_parser(&(client->pinfo),
+    put_new_data_to_parser(&(client->parser),
         client->read_buffer,
         client->read_available);
 
     do {
-        cmd = get_cmd(&(client->pinfo));
+        cmd = get_command(&(client->parser));
+
         if (cmd == NULL)
             break;
+
         if (cmd->type == CMD_PROTOCOL_PARSE_ERROR) {
-            mark_client_to_disconnect(client,
-                REASON_PROTOCOL_PARSE_ERROR);
+            client->to_disconnect = 1;
+            client->reason = REASON_PROTOCOL_PARSE_ERROR;
             break;
         }
-#ifndef DAEMON
-        print_cmd(cmd);
-#endif
-        destroy_str = execute_cmd(sinfo, client, cmd);
-        destroy_cmd(cmd, destroy_str);
-#if 0
-        add_async_prefixes(sinfo, client);
-#endif
-        add_prompt(client);
+
+        execute_command(server, client, cmd);
+        destroy_command(cmd);
+        msg_prompt(&(client->write_buf));
     } while (1);
 }
 
-void read_ready_data(server_info *sinfo, fd_set *ready_fds)
+static void read_ready_data(server_t *server, fd_set *ready_fds)
 {
-    client_info *cur_c = sinfo->first_client;
-    client_info *next_c;
+    client_t *cur_c = server->first_client;
+    client_t *next_c;
     int read_value;
 
     while (cur_c != NULL) {
@@ -581,175 +357,219 @@ void read_ready_data(server_info *sinfo, fd_set *ready_fds)
             perror("read()");
 #endif
             cur_c->connected = 0;
-            mark_client_to_disconnect(cur_c, REASON_BY_CLIENT);
+            cur_c->to_disconnect = 1;
+            cur_c->reason = REASON_BY_CLIENT;
         } else if (READ_EOF(read_value)) {
             cur_c->connected = 0;
-            mark_client_to_disconnect(cur_c, REASON_BY_CLIENT);
+            cur_c->to_disconnect = 1;
+            cur_c->reason = REASON_BY_CLIENT;
         } else {
             cur_c->read_available = read_value;
-            process_readed_data(sinfo, cur_c);
+            process_readed_data(server, cur_c);
         }
 
-        try_to_disconnect(sinfo, cur_c);
         cur_c = next_c;
     } /* while */
 }
 
-void try_to_start_new_round(server_info *sinfo)
+static void new_round(server_t *server, uint players_count)
 {
-    client_info *cur_c;
+    player_t **players = NULL;
+    client_t *cur_c;
+    uint i = 0;
 
-    sinfo->time_to_next_event = -1;
-    sinfo->backward_warnings_counter = 0;
+    players = (player_t **) malloc(sizeof(player_t *) * players_count);
 
-    if (sinfo->players_count <= 1) {
-        notify_all_round_less_two_players(sinfo);
-        try_to_deferred_start_round(sinfo);
-        return;
-    }
-
-    new_game_data(sinfo);
-
-    for (cur_c = sinfo->first_client;
+    for (cur_c = server->first_client;
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        add_msg_head(&(cur_c->write_buf),
-            "[Rounds]\n", MSG_ASYNC);
-
         if (cur_c->want_to_next_round) {
-            cur_c->in_round = 1;
             cur_c->want_to_next_round = 0;
-            ADD_S(&(cur_c->write_buf),
-"Game ready! You are player of this game round.\n");
-            new_client_game_data(cur_c);
-            /* TODO: write count and list of players. */
-        } else {
-            ADD_S(&(cur_c->write_buf),
-"Game ready! You are *not* player of this game round.\n");
+            players[i] = cur_c->player = new_player(cur_c->nick);
+            ++i;
         }
     }
 
-    sinfo->in_round = 1;
+    server->game = new_game(players, players_count);
+    server->state = ST_SERVER_GAME;
 }
 
-void process_time_events(server_info *sinfo)
+static void process_time_events(server_t *server, expire_t *expire,
+    uint time_before_round)
 {
-    if (sinfo->backward_warnings_counter > 0) {
-        sinfo->time_to_next_event = sinfo->time_between_time_events;
-        warn_all(sinfo);
+    uint players_count = 0;
+    client_t *cur_c;
+
+    for (cur_c = server->first_client;
+        cur_c != NULL;
+        cur_c = cur_c->next)
+    {
+        players_count += cur_c->want_to_next_round;
+    }
+
+    if (expire->all > 0) {
+        msg_info_clients(server, "Round starts via %d sec.", expire->all);
+    } else if (players_count > 1) {
+        new_round(server, players_count);
+        msg_round_new_clients(server);
     } else {
-        /* sinfo->backward_warnings_counter == 0 */
-        try_to_start_new_round(sinfo);
-    }
-#if 0
-    add_async_prefixes(sinfo, NULL);
-#endif
-}
-
-#ifdef DAEMON_ALT
-void daemon_alt()
-{
-    int fork_value;
-
-    if (CHDIR_ERROR(chdir("/"))) {
-        perror("chdir()");
-        exit(ES_SYSCALL_FAILED);
-    }
-
-    if (CLOSE_ERROR(close(STDIN_FILENO))
-        || CLOSE_ERROR(close(STDOUT_FILENO))
-        || CLOSE_ERROR(close(STDERR_FILENO)))
-    {
-        perror("close()");
-        exit(ES_SYSCALL_FAILED);
-    }
-
-    if (CLOSE_ERROR(open("/dev/null", O_WRONLY))
-        || CLOSE_ERROR(open("/dev/null", O_RDONLY))
-        || CLOSE_ERROR(open("/dev/null", O_RDONLY)))
-    {
-        perror("open()");
-        exit(ES_SYSCALL_FAILED);
-    }
-
-    fork_value = fork();
-    if (FORK_ERROR(fork_value)) {
-        perror("fork()");
-        exit(ES_SYSCALL_FAILED);
-    } else if (FORK_PARENT(fork_value)) {
-        exit(0);
-    }
-
-    if (SETSID_ERROR(setsid())) {
-        perror("setsid()");
-        exit(ES_SYSCALL_FAILED);
+        expire_set(expire, time_before_round);
+        server->state = ST_SERVER_COUNTER;
+        msg_info_clients(server,
+            "New round starts via %d sec.", expire->all);
     }
 }
-#endif
 
-int main(int argc, char **argv, char **envp)
+/* Wait new client, data from exist clients or expire of time period. */
+static int wait_for_events(fd_set *ready_fds, int max_fd, expire_t *expire)
 {
-    server_info sinfo;
-    int select_value;
-    fd_set ready_fds;
     struct timeval tv;
     time_t delta_time;
+    int select_value;
 
-    sinfo.listening_port = DEFAULT_LISTENING_PORT;
-    process_cmd_line_parameters(&sinfo, argv + 1);
+    if (expire->cur < 0) {
+        return select(max_fd + 1, ready_fds, NULL, NULL, NULL);
+    }
+
+    tv.tv_sec = expire->cur;
+
+    if (tv.tv_sec == 0) {
+        /* For avoid high network loading. */
+        tv.tv_usec = 100000; /* 0.1 seconds */
+    } else {
+        tv.tv_usec = 0;
+    }
+
+    time(&delta_time); /* Save old time. */
+
+    select_value = select(max_fd + 1, ready_fds, NULL, NULL, &tv);
+
+    delta_time = time(NULL) - delta_time; /* Calculate delta time. */
+
+    if (SELECT_TIMEOUT(select_value)) {
+        if (expire->all <= delta_time) {
+            expire_stop(expire);
+        } else {
+            expire_dec(expire, delta_time);
+        }
+    } else {
+        expire_dec(expire, delta_time);
+    }
+
+    return select_value;
+}
+
+/* Must be called, if clients count may be increased. */
+static void maybe_increased_callback(server_t *server,
+    expire_t *expire, arguments_t *arguments)
+{
+    if (server->state == ST_SERVER_START
+        && server->clients_count > 1)
+    {
+        expire_set(expire, arguments->time_before_round);
+        server->state = ST_SERVER_COUNTER;
+        msg_info_clients(server,
+            "New round starts via %d sec.", expire->all);
+    }
+}
+
+/* Must be called, if clients or players count may be decreased. */
+static void maybe_decreased_callback(server_t *server,
+    expire_t *expire, arguments_t *arguments)
+{
+    if (server->state == ST_SERVER_COUNTER
+        && server->clients_count <= 1)
+    {
+        expire_stop(expire);
+        server->state = ST_SERVER_START;
+        msg_info_clients(server,
+            "New-round backward counter are stopped.");
+    } else if (server->state == ST_SERVER_GAME
+        && server->game->players_count <= 1)
+    {
+        game_over(server);
+
+        if (server->clients_count <= 1) {
+            server->state = ST_SERVER_START;
+            msg_info_clients(server, "Game over!");
+        } else {
+            expire_set(expire, arguments->time_before_round);
+            server->state = ST_SERVER_COUNTER;
+            msg_info_clients(server,
+                "Game over! New round starts via %d sec.", expire->all);
+        }
+    }
+}
+
+int main(int argc, const char **argv)
+{
+    arguments_t arguments;
+    expire_t expire;
+    server_t server;
+    fd_set ready_fds;
+    int select_value;
+
+    process_arguments(&arguments, argv + 1);
+
+    if (arguments.server_ip == NULL) {
+        fprintf(stderr, "Server IP omited. Exiting...\n");
+        exit(ES_WRONG_ARGS);
+    }
 
 #ifdef DAEMON
-    printf("Fork to background...\n");
-#ifdef DAEMON_ALT
-    daemon_alt();
-#else
+    if (isatty(STDOUT_FILENO)) {
+        printf("Fork to background...\n");
+    }
     daemon(0, 0);
 #endif
-#endif
 
-    init_server_info(&sinfo);
+    expire_stop(&expire);
+    new_server(&server, arguments.server_ip, arguments.server_port);
 
     do {
-        ready_fds = sinfo.read_fds;
+        /* Copy all available file descriptors. */
+        ready_fds = server.read_fds;
 
-        /* Wait new client, data from exist clients or
-         * expire of time period. */
-        if (sinfo.time_to_next_event < 0) {
-            select_value = select(sinfo.max_fd + 1, &ready_fds,
-                NULL, NULL, NULL);
-        } else {
-            tv.tv_sec = sinfo.time_to_next_event;
-            if (tv.tv_sec == 0)
-                /* For avoid high network loading. */
-                tv.tv_usec = 100000; /* 0.1 seconds */
-            else
-                tv.tv_usec = 0;
-            time(&delta_time);
-            select_value = select(sinfo.max_fd + 1, &ready_fds,
-                NULL, NULL, &tv);
-            delta_time = time(NULL) - delta_time;
-        }
+        select_value =
+            wait_for_events(&ready_fds, server.max_fd, &expire);
 
+        /* Error */
         if (SELECT_ERROR(select_value)) {
             perror("select()");
             exit(ES_SYSCALL_FAILED);
         }
 
+        /* Timeout */
         if (SELECT_TIMEOUT(select_value)) {
-            process_time_events(&sinfo);
-        } else if (sinfo.time_to_next_event > 0) {
-            sinfo.time_to_next_event -= delta_time;
-            if (sinfo.time_to_next_event < 0)
-                sinfo.time_to_next_event = 0;
+            process_time_events(&server, &expire, arguments.time_before_round);
         }
 
-        if (FD_ISSET(sinfo.listening_socket, &ready_fds)) {
-            process_new_client(&sinfo, sinfo.listening_socket);
+        /* New client */
+        if (FD_ISSET(server.listening_socket, &ready_fds)) {
+            process_new_client(&server, arguments.max_clients);
+            maybe_increased_callback(&server, &expire, &arguments);
         }
 
-        read_ready_data(&sinfo, &ready_fds);
-        write_buffers_all_clients(&sinfo);
+        /* Data from client */
+        read_ready_data(&server, &ready_fds);
+
+        /* Process disconnected clients */
+        process_disconnected(&server);
+
+        maybe_decreased_callback(&server, &expire, &arguments);
+
+        /* Process requests */
+        if (ready_to_new_month(server.game)) {
+            end_month(server.game);
+            msg_month_over_clients(&server);
+            new_month(server.game);
+            bankrupts_to_clients(&server);
+        }
+
+        maybe_decreased_callback(&server, &expire, &arguments);
+
+        write_buffers_all_clients(&server);
     } while (1);
 
     return 0;

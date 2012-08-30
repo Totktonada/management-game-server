@@ -6,3 +6,4 @@ deps.mk
 valgrind.log
 *.h.gch
 *.plist
+tags

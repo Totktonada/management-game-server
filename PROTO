@@ -1,0 +1,276 @@
+==== General notes ====
+
+* If some object described as having length NN symbols (without terminational
+* '\n' if present), but it contain least count of symbols, therefore it
+* completed with spaces from the left.
+
+* 'something' is one token. Parser must know length of each table cell.
+
+* 'nick' is one word (token, lexeme), length is 10 symbols, not contain ':'.
+
+* [ SOMETHING] mean that SOMETHING is optional, can be presented,
+* can be not.
+
+* { SOMETHING }{n-m} mean that SOMETHING repeated from n to m times.
+
+* NUMBER(NN) is number, which string representation has length NN.
+
+* 'number' is unsigned 32-bit number, length: 10.
+
+* HEADER(NN) and TEXT(NN) cannot contain '\n', TEXT(NN) cannot contain ':'.
+* This contain maximum NN symbols (but can be least) and be moved to (80-NN)
+* symbols right. NN is in range [10; 80].
+
+* Note: MULTILINE, TEXT, HEADER and implemented via 'add_str' function.  We not
+* make static or runtime checks for length or other restriction, simply make
+* messages conforming them (and make checks for nick before accept it).
+
+* MULTILINE_TEXT cannot contain "\n----\n". First line must contain maximum 78
+* symbols, follow lines must contain maximum 80 symbols (without '\n').
+
+* Branch eps mean that expecting spaces, which amount equal to message length.
+
+==== Commands list ====
+
+* help [command]
+* nick [nick]
+* clients
+* players
+* requests
+* market
+* build count
+* make count
+* buy count cost
+* sell count cost
+* turn
+* join
+
+==== Common message objects ====
+
+EXPLICIT_NUMBER -> "         0" | 'number'
+
+IS(str)  -> str | eps
+
+POSITIVE -> '+' NUMBER(7) | eps
+NEGATIVE -> '-' NUMBER(7) | eps
+// Length: 8.
+
+RISE    -> '+' '$' 'number' | eps
+EXPENSE -> '-' '$' 'number' | eps
+// Length: 12.
+
+MONEY   -> '$' 'number' | EXPENSE | eps
+// Length: 12.
+
+PROCENT -> ['digit'] 'digit' '%' | eps
+// Length: 3.
+
+==== Prefixes ====
+
+* All prefixes has length 2.
+
+OK    -> '+' ' '
+FAIL  -> '-' ' '
+
+PREFIX_PROTO         -> 'p' ' '
+PREFIX_DISCONNECTING -> 'e' ' '
+PREFIX_ROUND_NEW     -> 'r' ' '
+PREFIX_MONTH_OVER    -> 'm' ' '
+PREFIX_ROUND_OVER    -> 'o' ' '
+PREFIX_NICK_CHANGED  -> 'n' ' '
+PREFIX_DISCONNECTING -> 'd' ' '
+PREFIX_INFO          -> 'i' ' '
+
+==== First message ====
+
+PREFIX_PROTO TEXT(69) ':' ' ' NUMBER(7) '\n'
+// Number is protocol version.
+
+==== Prompt ====
+
+PROMPT -> TIME '$' ' '
+TIME -> '[' 'digit' 'digit' ':' 'digit' 'digit' ':' 'digit' 'digit'
+    ']' ' ' | eps
+
+==== Command responces (help, nick, clients) ====
+
+// clients
++ Nickname  State
+0000000000 000000
+
+$ help
+OK   MULTILINE_TEXT "\n----\n"
+
+$ help CMD_NAME
+OK   MULTILINE_TEXT "\n----\n"
+FAIL TEXT(78) '\n'
+// Fail conditions: unknown command.
+
+$ nick
+OK   TEXT(66) ':' ' ' 'nick' '\n'
+
+$ nick 'nick'
+OK   TEXT(78) '\n'
+FAIL TEXT(78) '\n'
+// Fail conditions: already exists, contain forbidden symbols or too long.
+
+$ clients
+OK   HEADER(78) '\n' { 'nick' ' ' CLIENT_STATE '\n' }{0-infty}
+// Columns: nick, state.
+
+CLIENT_STATE -> "       " |
+                " player" |
+                "wishful"
+// Length: 6.
+
+==== Command responces (players) ====
+
+// PLAYERS_T
++ Nickname        Money        Raw       Prod       Fact M.turn?
+0000000000 0$0000000000 0000000000 0000000000 0000000000 0000
+
+$ players
+OK   HEADER(78) '\n' { PLAYERS_T_ENTRY }{1-infty}
+FAIL TEXT(78)
+// Fail conditions: game is over.
+
+PLAYERS_T_ENTRY -> 'nick' ' ' MONEY ' ' 'number' ' ' 'number'
+    ' ' 'number' ' ' IS("turn") '\n'
+// Columns: nick, money, raw, prod, fact, is turned.
+// Length: 61 (10+12+3*10+4+5).
+
+==== Command responces (requests) ====
+
+// REQ_T1
++    Raw     Raw cost     Prod    Prod cost  To make    Make cost
++0000000 -$0000000000 -0000000 +$0000000000 +0000000 -$0000000000
+
+// REQ_T2
+To build   Fact pay 1   Fact pay 2  Raw expense Prod expense Fact expense
++0000000 -$0000000000 -$0000000000 -$0000000000 -$0000000000 -$0000000000
+
+$ requests
+OK   REQ_T1 REQ_T2
+FAIL TEXT(78)
+// Fail conditions: game is over.
+
+REQ_T1 -> POSITIVE ' ' EXPENSE ' ' NEGATIVE ' ' RISE
+    ' ' POSITIVE ' ' EXPENSE '\n'
+// Columns: raw, raw cost, prod, prod cost, make, make cost.
+// Length: 65 (8*3+12*3+5).
+
+REQ_T2 -> POSITIVE ' ' EXPENSE ' ' EXPENSE ' ' EXPENSE
+    ' ' EXPENSE ' ' EXPENSE '\n'
+// Columns: fact, pay 1, pay 2, raw exp, prod exp, fact exp.
+// Length: 73 (8+12*5+5).
+
+==== Command responces (market) ====
+
+// MARKET_T
++    Month   Level        Raw     Raw cost       Prod    Prod cost
+0000000000 0000000 0000000000 0$0000000000 0000000000 0$0000000000
+
+// NEXT_LVL_T
+Levels probability
+00% 00% 00% 00% 00%
+
+$ market
+OK   MARKET_T NEXT_LVL_T
+FAIL TEXT(78) '\n'
+// Fail conditions: game is over.
+
+MARKET_T -> HEADER(78) '\n' EXPLICIT_NUMBER ' ' NUMBER(7) ' ' 'number'
+    ' ' MONEY ' ' 'number' ' ' MONEY '\n'
+// Columns: month, level, raw, raw_cost, prod, prod_cost.
+// Length: 66.
+
+NEXT_LVL_T -> HEADER(80) '\n' PROCENT ' ' PROCENT ' ' PROCENT ' ' PROCENT
+    ' ' PROCENT '\n'
+// Procents: level 1, 2, 3, 4, 5.
+// Length: 19 (3*5+4).
+
+==== Command responces (build, make, buy, sell, turn, join) ====
+
+$ build 'number'          // count
+$ make  'number'          // count
+$ buy   'number' 'number' // count and cost
+$ sell  'number' 'number' // count and cost
+$ turn
+OK   TEXT(78) '\n'
+FAIL TEXT(78) '\n'
+// Fail conditions: game is over, not player, already closed month,
+// market restriction or low player resources.
+
+$ join
+OK   TEXT(78) '\n'
+FAIL TEXT(78) '\n'
+// Fail conditions: already make join request, currently in game (in round).
+
+==== Asynchronous messages ====
+
+// MONTH_OVER_T1
+  Nickname      Raw     Raw cost     Prod    Prod cost
+0000000000 +0000000 -$0000000000 -0000000 +$0000000000
+
+// MONTH_OVER_T2
+  Nickname  To make    Make cost    Build   Fact pay 1   Fact pay 2
+0000000000 +0000000 -$0000000000 +0000000 -$0000000000 -$0000000000
+
+// MONTH_OVER_T3
+  Nickname  Raw expense Prod expense Fact expense        Money Resolu-n
+0000000000 -$0000000000 -$0000000000 -$0000000000 0$0000000000 00000000
+
+* We have seven async. messages: early disconecting, new round, month over,
+* nick changing, round over, disconnecting and information for user.
+
+* EARLY_DISCONNECTING message mean that server disconnect you before choose
+* nickname. Other users not notified about this.
+
+* ROUND_NEW can be arrived after apropos 'join' command.
+
+* MONTH_OVER can be arrived after apropos 'turn' command (more exactly, after
+* all players entered 'turn' command).
+
+* After that you can arrive ROUND_OVER message.
+
+* DISCONNECTING message sent to client, which will be disconnected now. Also,
+* this message sent to all connected clients.
+
+* NICK_CHANGED, DISCONNECTING and INFO messages can be sent before or after any
+* messages.
+
+* INFO message provide information, which useless for bot, but desined for
+* human user.
+
+EARLY_DISCONNECTING -> PREFIX_EARLY_DISCONNECTING TEXT(78) '\n'
+ROUND_NEW     -> PREFIX_ROUND_NEW     TEXT(78) '\n' PLAYERS_LIST
+MONTH_OVER    -> PREFIX_MONTH_OVER    TEXT(78) '\n'
+    MONTH_OVER_T1 MONTH_OVER_T2 MONTH_OVER_T
+ROUND_OVER    -> PREFIX_ROUND_OVER    TEXT(78) '\n' PLAYERS_LIST
+NICK_CHANGED  -> PREFIX_NICK_CHANGED  'nick'   " -> " 'nick' '\n'
+DISCONNECTING -> PREFIX_DISCONNECTING 'nick'   ' '  TEXT(67) '\n'
+INFO          -> PREFIX_INFO          TEXT(78) '\n'
+
+PLAYERS_LIST -> { 'nick' '\n' }{1-infty}
+// Length: 10.
+
+MONTH_OVER_T1 -> HEADER(80) '\n' { MONTH_OVER_T1_ENTRY }{1-infty}
+MONTH_OVER_T2 -> HEADER(80) '\n' { MONTH_OVER_T2_ENTRY }{1-infty}
+MONTH_OVER_T3 -> HEADER(80) '\n' { MONTH_OVER_T3_ENTRY }{1-infty}
+
+MONTH_OVER_T1_ENTRY -> 'nick' ' '  POSITIVE ' ' EXPENSE ' ' NEGATIVE
+    ' ' RISE '\n'
+// Columns: nick, raw, raw cost, prod, prod cost.
+// Length: 54 (10+8*2+12*2+4).
+
+MONTH_OVER_T2_ENTRY -> 'nick' ' ' POSITIVE ' ' EXPENSE ' ' POSITIVE
+    ' ' EXPENSE ' ' EXPENSE '\n'
+// Columns: nick, make, make cost, fact, pay 1, pay 2.
+// Length: 67 (10+8*2+12*3+5).
+
+MONTH_OVER_T3_ENTRY -> 'nick' ' ' EXPENSE ' ' EXPENSE ' ' EXPENSE
+    ' ' MONEY ' ' IS("bankrupt") '\n'
+// Columns: nick, raw, prod, fact, money, resolution.
+// Length: 70 (10+12*4+8+4).
+
+// vim: set ft=asciidoc:

@@ -1,33 +1,16 @@
 #include "lexer.h"
 
-void new_lexer_info(lexer_info *linfo)
-{
-    linfo->state = ST_START;
-    new_buffer(&(linfo->buf));
-    linfo->read_pointer = NULL;
-    linfo->read_available = 0;
-    /* linfo->c is undefined */
-    linfo->request_for_char = 1;
-}
-
-void put_new_data_to_lexer(lexer_info *linfo,
-    char *read_buffer, int read_available)
-{
-    linfo->read_pointer = read_buffer;
-    linfo->read_available = read_available;
-}
-
 /* Returns new lexeme.
  * If (type == LEX_NUMBER) and number processing
  * failed returns lexeme with LEX_WRONG_NUMBER type.
  * Returns LEX_WRONG_NUMBER possible,
  * if type argument is LEX_NUMBER or LEX_WRONG_NUMBER.
  * This function clear buffer if type is LEX_WORD or LEX_NUMBER. */
-lexeme *new_lex(type_of_lex type, buffer *buf)
+static lexeme *new_lex(type_of_lex type, buffer *buf)
 {
     lexeme *lex = (lexeme *) malloc(sizeof(lexeme));
     char *tmp_str;
-    long int tmp_number;
+    long tmp_number;
 
     lex->type = type;
 
@@ -63,16 +46,150 @@ lexeme *new_lex(type_of_lex type, buffer *buf)
 /* Returns:
  * 1, if new char readed;
  * 0, otherwise. */
-int get_char(lexer_info *linfo)
+static int get_char(lexer_t *lexer)
 {
-    if (linfo->read_available <= 0)
+    if (lexer->read_available <= 0)
         return 0;
 
-    linfo->c = *(linfo->read_pointer);
-    ++(linfo->read_pointer);
-    --(linfo->read_available);
+    lexer->c = *(lexer->read_pointer);
+    ++(lexer->read_pointer);
+    --(lexer->read_available);
 
     return 1;
+}
+
+static lexeme *st_start(lexer_t *lexer)
+{
+    lexeme *lex = NULL;
+
+    if (lexer->c == '\n') {          /* '\n' */
+        lexer->state = ST_PROTOCOL_PARSE_ERROR;
+    } else if (isblank(lexer->c)) { /* ' ', '\t' */
+        lexer->request_for_char = 1;
+    } else if (isdigit(lexer->c)) { /* [0-9] */
+        lexer->state = ST_NUMBER;
+    } else if (lexer->c == '\r') {   /* '\r' */
+        lexer->state = ST_EOLN;
+        lexer->request_for_char = 1;
+    } else {                         /* any other */
+        lexer->state = ST_WORD;
+    }
+
+    return lex;
+}
+
+static lexeme *st_word(lexer_t *lexer)
+{
+    lexeme *lex = NULL;
+
+    if (lexer->c == '\n') {
+        lexer->state = ST_PROTOCOL_PARSE_ERROR;
+        clear_buffer(&(lexer->buf));
+    } else if (isblank(lexer->c) || lexer->c == '\r') {
+        /* ' ', '\t', '\r' */
+        lexer->state = ST_START;
+        lex = new_lex(LEX_WORD, &(lexer->buf));
+    } else {
+        add_to_buffer(&(lexer->buf), lexer->c);
+        lexer->request_for_char = 1;
+    }
+
+    return lex;
+}
+
+static lexeme *st_number(lexer_t *lexer)
+{
+    lexeme *lex = NULL;
+
+    if (lexer->c == '\n') {
+        lexer->state = ST_PROTOCOL_PARSE_ERROR;
+        clear_buffer(&(lexer->buf));
+    } else if (isblank(lexer->c) || lexer->c == '\r') {
+        /* ' ', '\t', '\r' */
+        lexer->state = ST_START;
+        lex = new_lex(LEX_NUMBER, &(lexer->buf));
+    } else if (isdigit(lexer->c)) {
+        /* [0-9] */
+        add_to_buffer(&(lexer->buf), lexer->c);
+        lexer->request_for_char = 1;
+    } else {
+        lexer->state = ST_WORD;
+    }
+
+    return lex;
+}
+
+static lexeme *st_eoln(lexer_t *lexer)
+{
+    lexeme *lex = NULL;
+
+    if (lexer->c == '\n') {
+        lexer->state = ST_START;
+        lexer->request_for_char = 1;
+        lex = new_lex(LEX_EOLN, NULL);
+    } else {
+        lexer->state = ST_PROTOCOL_PARSE_ERROR;
+    }
+
+    return lex;
+}
+
+static lexeme *st_protocol_parse_error()
+{
+    return new_lex(LEX_PROTOCOL_PARSE_ERROR, NULL);
+}
+
+void new_lexer(lexer_t *lexer)
+{
+    lexer->state = ST_START;
+    new_buffer(&(lexer->buf));
+    lexer->read_pointer = NULL;
+    lexer->read_available = 0;
+    /* lexer->c is undefined */
+    lexer->request_for_char = 1;
+}
+
+void put_new_data_to_lexer(lexer_t *lexer,
+    char *read_buffer, int read_available)
+{
+    lexer->read_pointer = read_buffer;
+    lexer->read_available = read_available;
+}
+
+lexeme *get_lex(lexer_t *lexer)
+{
+    lexeme *lex = NULL;
+
+    do {
+        if (lexer->request_for_char) {
+            if (get_char(lexer)) {
+                lexer->request_for_char = 0;
+            } else {
+                /* Request for new data */
+                return NULL;
+            }
+        }
+
+        switch (lexer->state) {
+        case ST_START:
+            lex = st_start(lexer);
+            break;
+        case ST_WORD:
+            lex = st_word(lexer);
+            break;
+        case ST_NUMBER:
+            lex = st_number(lexer);
+            break;
+        case ST_EOLN:
+            lex = st_eoln(lexer);
+            break;
+        case ST_PROTOCOL_PARSE_ERROR:
+            lex = st_protocol_parse_error();
+            break;
+        } /* switch */
+    } while (lex == NULL);
+
+    return lex;
 }
 
 void destroy_lex(lexeme *lex, int free_data)
@@ -84,127 +201,4 @@ void destroy_lex(lexeme *lex, int free_data)
         free(lex->value.str);
     }
     free(lex);
-}
-
-lexeme *st_start(lexer_info *linfo)
-{
-    lexeme *lex = NULL;
-
-    /* TODO: switch more pretty, but isdigit() is necessary. */
-    if (linfo->c == '\n') {          /* '\n' */
-        linfo->state = ST_PROTOCOL_PARSE_ERROR;
-    } else if (isblank(linfo->c)) { /* ' ', '\t' */
-        linfo->request_for_char = 1;
-    } else if (isdigit(linfo->c)) { /* [0-9] */
-        linfo->state = ST_NUMBER;
-    } else if (linfo->c == '\r') {   /* '\r' */
-        linfo->state = ST_EOLN;
-        linfo->request_for_char = 1;
-    } else {                         /* any other */
-        linfo->state = ST_WORD;
-    }
-
-    return lex;
-}
-
-lexeme *st_word(lexer_info *linfo)
-{
-    lexeme *lex = NULL;
-
-    if (linfo->c == '\n') {
-        linfo->state = ST_PROTOCOL_PARSE_ERROR;
-        clear_buffer(&(linfo->buf));
-    } else if (isblank(linfo->c) || linfo->c == '\r') {
-        /* ' ', '\t', '\r' */
-        linfo->state = ST_START;
-        lex = new_lex(LEX_WORD, &(linfo->buf));
-    } else {
-        add_to_buffer(&(linfo->buf), linfo->c);
-        linfo->request_for_char = 1;
-    }
-
-    return lex;
-}
-
-lexeme *st_number(lexer_info *linfo)
-{
-    lexeme *lex = NULL;
-
-    if (linfo->c == '\n') {
-        linfo->state = ST_PROTOCOL_PARSE_ERROR;
-        clear_buffer(&(linfo->buf));
-    } else if (isblank(linfo->c) || linfo->c == '\r') {
-        /* ' ', '\t', '\r' */
-        linfo->state = ST_START;
-        lex = new_lex(LEX_NUMBER, &(linfo->buf));
-    } else if (isdigit(linfo->c)) {
-        /* [0-9] */
-        add_to_buffer(&(linfo->buf), linfo->c);
-        linfo->request_for_char = 1;
-    } else {
-        linfo->state = ST_WORD;
-    }
-
-    return lex;
-}
-
-lexeme *st_eoln(lexer_info *linfo)
-{
-    lexeme *lex = NULL;
-
-    if (linfo->c == '\n') {
-        linfo->state = ST_START;
-        linfo->request_for_char = 1;
-        lex = new_lex(LEX_EOLN, NULL);
-    } else {
-        linfo->state = ST_PROTOCOL_PARSE_ERROR;
-    }
-
-    return lex;
-}
-
-lexeme *st_protocol_parse_error(lexer_info *linfo)
-{
-    return new_lex(LEX_PROTOCOL_PARSE_ERROR, NULL);
-}
-
-/* If new data necessary, returned NULL.
- * Otherwise, returned not NULL lexeme. */
-lexeme *get_lex(lexer_info *linfo)
-{
-    lexeme *lex = NULL;
-
-    /* TODO: сделать кавычки. Превращают число в слово
-     * и склеивают слова с табами/пробелами. */
-
-    do {
-        if (linfo->request_for_char) {
-            if (get_char(linfo)) {
-                linfo->request_for_char = 0;
-            } else {
-                /* Request for new data */
-                return NULL;
-            }
-        }
-
-        switch (linfo->state) {
-        case ST_START:
-            lex = st_start(linfo);
-            break;
-        case ST_WORD:
-            lex = st_word(linfo);
-            break;
-        case ST_NUMBER:
-            lex = st_number(linfo);
-            break;
-        case ST_EOLN:
-            lex = st_eoln(linfo);
-            break;
-        case ST_PROTOCOL_PARSE_ERROR:
-            lex = st_protocol_parse_error(linfo);
-            break;
-        } /* switch */
-    } while (lex == NULL);
-
-    return lex;
 }

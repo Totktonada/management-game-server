@@ -12,3 +12,7 @@ Used buffer.[ch] from https://github.com/Totktonada/shell .
     (the book has english and russian releases).
 [2] http://www.stolyarov.info/books/gameserv
     (only in russian).
+
+==== Protocol ====
+
+Server protocol described in file PROTO.

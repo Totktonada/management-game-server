@@ -33,19 +33,24 @@ typedef enum lexer_state {
     ST_PROTOCOL_PARSE_ERROR
 } lexer_state;
 
-typedef struct lexer_info {
+typedef struct lexer_t {
     lexer_state state;
     char *read_pointer;
     int read_available;
     buffer buf;
     char c; /* current symbol */
-    unsigned int request_for_char:1;
-} lexer_info;
+    uint request_for_char:1;
+} lexer_t;
 
-void new_lexer_info(lexer_info *linfo);
-void put_new_data_to_lexer(lexer_info *linfo,
+void new_lexer(lexer_t *lexer);
+
+void put_new_data_to_lexer(lexer_t *lexer,
     char *read_buffer, int read_available);
-lexeme *get_lex(lexer_info *linfo);
+
+/* If new data necessary, returned NULL.
+ * Otherwise, returned not NULL lexeme. */
+lexeme *get_lex(lexer_t *lexer);
+
 void destroy_lex(lexeme *lex, int free_data);
 
 #endif

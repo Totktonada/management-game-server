@@ -2,25 +2,9 @@
 #define MAIN_H_SENTRY
 
 #include <sys/time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/select.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-
-#define DEFAULT_LISTENING_PORT 37187
-#define READ_BUFFER_SIZE 1024
-#define WARNINGS_BEFORE_ROUND 6
 
 #include "parser.h"
-#include "utils.h"
+#include "game.h"
 #include "msg_buffer.h"
 
 /* Exit status, if one of next system calls failed:
@@ -43,104 +27,58 @@
 #define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 #define SETSID_ERROR(setsid_value) ((setsid_value) == -1)
 
+#define READ_BUFFER_SIZE 1024
+
 typedef enum disconnect_reasons {
     REASON_SERVER_FULL,
     REASON_BY_CLIENT,
     REASON_PROTOCOL_PARSE_ERROR
 } disconnect_reasons;
 
-typedef struct client_info {
+typedef struct client_t {
     /* Common */
-    struct client_info *next;
+    struct client_t *next;
     char *nick;
     int fd;
     int connected;
-    int to_disconnect;
-    disconnect_reasons reason;
-    unsigned int in_round:1;
-    unsigned int want_to_next_round:1;
     /* Read */
     char read_buffer[READ_BUFFER_SIZE];
     int read_available;
-    parser_info pinfo;
+    parser_t parser;
     /* Write */
     msg_buffer write_buf;
-    /* Client game data */
-    int money;
-    unsigned int raw_count;
-    unsigned int prod_count;
-    unsigned int factory_count;
-    unsigned int step_completed:1;
+    /* Player */
+    player_t *player;
     /* Requests */
-    unsigned int build_factory_count;
-    unsigned int make_prod_count;
-    /* Building factories. Count of
-     * 1, 2, 3, 4 month old factories. */
-    unsigned int building_factory_1;
-    unsigned int building_factory_2;
-    unsigned int building_factory_3;
-    unsigned int building_factory_4;
-    /* For write_client_information() */
-    unsigned int buy_raw_count;
-    unsigned int buy_raw_cost;
-    unsigned int sell_prod_count;
-    unsigned int sell_prod_cost;
-} client_info;
+    uint to_disconnect:1;
+    disconnect_reasons reason;
+    uint want_to_next_round:1;
+} client_t;
 
-typedef enum request_type {
-    REQUEST_RAW,
-    REQUEST_PROD
-} request_type;
+typedef enum server_state_t {
+    ST_SERVER_START,
+    ST_SERVER_COUNTER,
+    ST_SERVER_GAME
+} server_state_t;
 
-typedef struct request {
-    struct request *next;
-    client_info *client;
-    unsigned int count;
-} request;
-
-typedef struct request_group {
-    struct request_group *next;
-    unsigned int cost;
-    unsigned int req_count;
-    request *first_req;
-} request_group;
-
-typedef struct server_info {
+typedef struct server_t {
+    /* State */
+    server_state_t state;
+    /* Clients */
+    client_t *first_client;
+    client_t *last_client;
+    uint clients_count;
     /* Connecting data */
-    const char *server_ip;
-    int listening_port;
     int listening_socket;
     fd_set read_fds;
     int max_fd;
-    client_info *first_client;
-    client_info *last_client;
-    int clients_count;
-    int max_clients; /* -1 is without limitation */
-    time_t time_between_time_events;
-    time_t time_to_next_event;
-    unsigned int backward_warnings_counter;
     /* Game data */
-    int players_count;
-    unsigned int in_round:1;
-    unsigned int step;
-    unsigned int level; /* [0-4] */
-    request_group *buy_raw;
-    request_group *sell_prod;
-} server_info;
+    game_t *game;
+} server_t;
 
 typedef enum msg_type {
     MSG_RESPONCE,
     MSG_ASYNC
 } msg_type;
-
-void mark_client_to_disconnect(client_info *client,
-    disconnect_reasons reason);
-void process_end_round(server_info *sinfo);
-void try_to_deferred_start_round(server_info *sinfo);
-void add_msg_head(msg_buffer *write_buf,
-    char *head_str, msg_type type);
-
-#include "parameters.h"
-#include "game.h"
 
 #endif
