@@ -32,7 +32,7 @@ static void do_cmd_nick(msg_buffer *buf, server_t *server,
     } else if (is_valid_nick(nick) != NULL) {
         msg_cmd_fail(buf, is_valid_nick(nick));
     } else {
-        msg_cmd_nick_1(buf);
+        msg_cmd_ok(buf, "Your new nickname will be accepted now.");
         msg_nick_changed_clients(server, client->nick, nick);
 
         free(client->nick);

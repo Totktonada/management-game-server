@@ -36,9 +36,9 @@ uint get_random(uint max_value)
         (rand() / (RAND_MAX + 1.0)));
 }
 
-uint log10i(uint number)
+uint number_strlen(uint number)
 {
-    uint i = 0;
+    uint i = 1;
     uint del = 1;
 
     while (number / 10 >= del) {
@@ -121,7 +121,7 @@ uint update_time_buf(char *time_buf, uint buf_size)
 
     if (ok) {
         strftime_value = strftime(time_buf, buf_size,
-            "[%H:%M:%S] ", localtime_var);
+            "[%H:%M:%S]", localtime_var);
     }
 
     if (ok && STRFTIME_ERROR(strftime_value)) {

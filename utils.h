@@ -23,9 +23,8 @@ command_kind get_command_kind(const char *str);
 /* Get random number from 0 to max_value (inclusive). */
 uint get_random(uint max_value);
 
-/* Length of number string representation:
- * log10i(number) + 1 . */
-uint log10i(uint number);
+/* Length of number string representation, this value is log10(n) + 1. */
+uint number_strlen(uint number);
 
 /* It writes symbols to buf from 0 position, '\0' symbol is written
  * to the end. (2^32-1) contains 10 symbols, therefore for uint
@@ -37,7 +36,7 @@ uint number_to_str(char *buf, uint number);
 char *first_vacant_nick(const client_t *first_client);
 
 /* Get current (local) time and place it to time_buf
- * in format "[%H:%M:%S] ". On fail place "\0" to strbuf
+ * in format "[%H:%M:%S]". On fail place "\0" to strbuf
  * (if his size not zero). Mininum buffer size for successful
  * updating time buffer defined by TIME_BUFFER_SIZE macro.
  * Returns: 1 on success (time updated), 0 otherwise. */

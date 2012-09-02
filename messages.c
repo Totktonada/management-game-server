@@ -11,6 +11,13 @@
 
 #define PROTOCOL_VERSION 1
 
+static void number_overflow(const char *file, uint line)
+{
+#ifndef DAEMON
+    fprintf(stderr, "%s:%d Number overflow.\n", file, line);
+#endif
+}
+
 /* ==== Common message objects ==== */
 
 static void spaces(msg_buffer *buf, uint n)
@@ -20,90 +27,62 @@ static void spaces(msg_buffer *buf, uint n)
     }
 }
 
-/* Length: 10 symbols. */
-static void only_number(msg_buffer *buf, uint n)
-{
-    static char str[11];
-
-    number_to_str(str, n);
-    add_str(buf, str);
-}
-
-/* Length: 7 symbols. */
-static void only_number_short(msg_buffer *buf, uint n)
-{
-    static char str[8];
-
-    if (n > 9999999) {
-#ifndef DAEMON
-        fprintf(stderr, "%s:%d More than 7 digits in number.\n",
-            __FILE__, __LINE__);
-#endif
-        only_number(buf, n);
-    }
-
-    number_to_str(str, n);
-    add_str(buf, str);
-}
-
-/* Length: 10 symbols. */
 static void number(msg_buffer *buf, uint n)
 {
     static char str[11];
-    uint i = 0;
 
-    str[10] = '\0';
-
-    while (n != 0) {
-        str[9 - i] = '0' + (n % 10);
-        n /= 10;
-        ++i;
-    }
-
-    for (; i < 10; ++i) {
-        str[9 - i] = ' ';
-    }
-
+    number_to_str(str, n);
     add_str(buf, str);
 }
 
-/* Length: 7 symbols. */
 static void number_short(msg_buffer *buf, uint n)
 {
-    static char str[8];
-    uint i = 0;
-
-    str[7] = '\0';
-
     if (n > 9999999) {
-#ifndef DAEMON
-        fprintf(stderr, "%s:%d More than 7 digits in number.\n",
-            __FILE__, __LINE__);
-#endif
-        number(buf, n);
+        number_overflow(__FILE__, __LINE__);
+        n = 9999999;
     }
 
-    while (n != 0) {
-        str[6 - i] = '0' + (n % 10);
-        n /= 10;
-        ++i;
-    }
-
-    for (; i < 7; ++i) {
-        str[6 - i] = ' ';
-    }
-
-    add_str(buf, str);
+    number(buf, n);
 }
 
-/* Length: 10 symbols. */
-static void explicit_number(msg_buffer *buf, uint n)
+#if 0
+/* Length: 10. */
+static void number_or_spaces(msg_buffer *buf, uint n)
 {
     if (n == 0) {
-        add_str(buf, "         0");
-    } else {
-        number(buf, n);
+        spaces(buf, 10);
+        return;
     }
+
+    spaces(buf, 10 - number_strlen(n));
+    number(buf, n);
+}
+
+/* Length: 7. */
+static void number_or_spaces_short(msg_buffer *buf, uint n)
+{
+    if (n == 0) {
+        spaces(buf, 7);
+        return;
+    }
+
+    spaces(buf, 7 - number_strlen(n));
+    number_short(buf, n);
+}
+#endif
+
+/* Length: 10. */
+static void number_explicit(msg_buffer *buf, uint n)
+{
+    spaces(buf, 10 - number_strlen(n));
+    number(buf, n);
+}
+
+/* Length: 7. */
+static void number_explicit_short(msg_buffer *buf, uint n)
+{
+    spaces(buf, 7 - number_strlen(n));
+    number_short(buf, n);
 }
 
 static void is(msg_buffer *buf, uint yes, const char *str)
@@ -115,87 +94,128 @@ static void is(msg_buffer *buf, uint yes, const char *str)
     }
 }
 
+/* Length: 8. */
 static void positive(msg_buffer *buf, uint n)
 {
     if (n == 0) {
         spaces(buf, 8);
     } else {
-        spaces(buf, 7 - (log10i(n) + 1));
+        spaces(buf, 7 - number_strlen(n));
         add_char(buf, '+');
-        only_number_short(buf, n);
+        number_short(buf, n);
     }
 }
 
+/* Length: 8. */
 static void negative(msg_buffer *buf, uint n)
 {
     if (n == 0) {
         spaces(buf, 8);
     } else {
-        spaces(buf, 7 - (log10i(n) + 1));
+        spaces(buf, 7 - number_strlen(n));
         add_char(buf, '-');
-        only_number_short(buf, n);
+        number_short(buf, n);
     }
 }
 
+/* Length: 12. */
 static void rise(msg_buffer *buf, uint n)
 {
     if (n == 0) {
         spaces(buf, 12);
     } else {
-        spaces(buf, 10 - (log10i(n) + 1));
+        spaces(buf, 10 - number_strlen(n));
         add_char(buf, '+');
         add_char(buf, '$');
-        only_number(buf, n);
+        number(buf, n);
     }
 }
 
+/* Length: 12. */
 static void expense(msg_buffer *buf, uint n)
 {
     if (n == 0) {
         spaces(buf, 12);
     } else {
-        spaces(buf, 10 - (log10i(n) + 1));
+        spaces(buf, 10 - number_strlen(n));
         add_char(buf, '-');
         add_char(buf, '$');
-        only_number(buf, n);
+        number(buf, n);
     }
 }
 
+/* Length: 12. */
 static void money(msg_buffer *buf, sint n)
 {
-    if (n == 0) {
-        spaces(buf, 12);
-    } else if (n < 0) {
-        expense(buf, -n);
-    } else {
-        spaces(buf, 11 - (log10i(n) + 1));
+    if (n < 0) {
+        spaces(buf, 10 - number_strlen(-n));
+        add_char(buf, '-');
         add_char(buf, '$');
-        only_number(buf, n);
+        number(buf, -n);
+    } else {
+        spaces(buf, 11 - number_strlen(n));
+        add_char(buf, '$');
+        number(buf, n);
     }
 }
 
-/* n in range [0; 100]. */
-static void procent(msg_buffer *buf, uint n)
+/* Length: 3. */
+static void number_small(msg_buffer *buf, uint n)
 {
-    if (n == 0) {
-        spaces(buf, 3);
-    } else if (n < 10) {
+    if (n > 100) {
+        number_overflow(__FILE__, __LINE__);
+        n = 100;
+    }
+
+    if (n < 10) {
+        add_char(buf, ' ');
         add_char(buf, ' ');
         add_char(buf, '0' + (n % 10));
-        add_char(buf, '%');
-    } else if (n <= 100) {
+    } else if (n < 100) {
+        add_char(buf, ' ');
         add_char(buf, '0' + (n / 10));
         add_char(buf, '0' + (n % 10));
-        add_char(buf, '%');
     } else {
-#ifndef DAEMON
-        fprintf(stderr, "%s:%d Procent value bigger than 100.\n",
-            __FILE__, __LINE__);
-#endif
-
-        number(buf, n);
-        add_char(buf, '%');
+        /* n == 100 */
+        add_str(buf, "100");
     }
+}
+
+/* Length: 4. */
+static void procent(msg_buffer *buf, uint n)
+{
+    number_small(buf, n);
+    add_char(buf, '%');
+}
+
+static void multiline_text_end(msg_buffer *buf)
+{
+    add_str(buf, "\n----\n");
+}
+
+/* Multiline text can consist of two part for avoid very big constant strings. */
+static void multiline_text(msg_buffer *buf, const char *part1, const char *part2)
+{
+    if (part1 != NULL) {
+        add_str(buf, part1);
+    }
+
+    if (part2 != NULL) {
+        add_str(buf, part2);
+    }
+
+    multiline_text_end(buf);
+}
+
+static void header(msg_buffer *buf, const char *str)
+{
+    add_str(buf, str);
+    add_char(buf, '\n');
+}
+
+static void list_end(msg_buffer *buf)
+{
+    add_str(buf, "----\n");
 }
 
 /* Length: 10. */
@@ -275,24 +295,55 @@ void msg_first_message(msg_buffer *buf)
     add_str(buf, "Protocol version");
     add_char(buf, ':');
     add_char(buf, ' ');
-    number_short(buf, PROTOCOL_VERSION);
+    number(buf, PROTOCOL_VERSION);
     add_char(buf, '\n');
 }
 
 /* ==== Prompt ==== */
 
-/* Prompt format: "[%H:%M:%S] $ ". See 'update_time_buf'
- * in utils.c for more information. */
-void msg_prompt(msg_buffer *buf)
+/* Length: 10. */
+static void time(msg_buffer *buf)
 {
     static char time[TIME_BUFFER_SIZE];
 
     if (update_time_buf(time, sizeof(time))) {
         add_str(buf, time);
+    } else {
+        spaces(buf, 10);
     }
+}
 
-    add_char(buf, '$');
-    add_char(buf, ' ');
+/* Length: 13. */
+void msg_prompt(msg_buffer *buf)
+{
+    time(buf);
+    add_str(buf, " $ ");
+}
+
+/* ==== Common commands stuff ==== */
+
+void msg_cmd_ok(msg_buffer *buf, const char *str)
+{
+    ok(buf);
+    add_str(buf, str);
+    add_char(buf, '\n');
+}
+
+void msg_cmd_fail(msg_buffer *buf, const char *reason)
+{
+    fail(buf);
+    add_str(buf, reason);
+    add_char(buf, '\n');
+}
+
+void msg_cmd_wrong(msg_buffer *buf)
+{
+    static const char error_text[] =
+        "Wrong command or argument(s). See \"help\".";
+
+    fail(buf);
+    add_str(buf, error_text);
+    add_char(buf, '\n');
 }
 
 /* ==== help, nick, clients ==== */
@@ -330,9 +381,7 @@ Books:\n\
     (only in russian).";
 
     ok(buf);
-    add_str(buf, help_text_1);
-    add_str(buf, help_text_2);
-    add_str(buf, "\n----\n");
+    multiline_text(buf, help_text_1, help_text_2);
 }
 
 void msg_cmd_help_1(msg_buffer *buf, command_kind cmd)
@@ -348,40 +397,40 @@ void msg_cmd_help_1(msg_buffer *buf, command_kind cmd)
         break;
 
     case CMD_HELP:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_NICK:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_CLIENTS:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_PLAYERS:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_REQUESTS:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_MARKET:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_BUILD:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_MAKE:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_BUY:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_SELL:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_TURN:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
     case CMD_JOIN:
-        add_str(buf, ok_text_1);
+        multiline_text(buf, ok_text_1, NULL);
         break;
 
     case CMD_WRONG:
@@ -389,8 +438,6 @@ void msg_cmd_help_1(msg_buffer *buf, command_kind cmd)
         /* Not possible */
         break;
     }
-
-    add_str(buf, "\n----\n");
 }
 
 void msg_cmd_nick_0(msg_buffer *buf, const char *nick)
@@ -403,16 +450,6 @@ void msg_cmd_nick_0(msg_buffer *buf, const char *nick)
     add_char(buf, ':');
     add_char(buf, ' ');
     nickname(buf, nick);
-    add_char(buf, '\n');
-}
-
-void msg_cmd_nick_1(msg_buffer *buf)
-{
-    static const char ok_text[] =
-        "Your new nickname will be accepted now.";
-
-    ok(buf);
-    add_str(buf, ok_text);
     add_char(buf, '\n');
 }
 
@@ -429,12 +466,11 @@ static void client_state(msg_buffer *buf, const client_t *client)
 
 void msg_cmd_clients(msg_buffer *buf, const client_t *client)
 {
-    static const char header[] =
+    static const char header_text[] =
         "Nickname  State";
 
     ok(buf);
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     while (client) {
         nickname(buf, client->nick);
@@ -443,6 +479,8 @@ void msg_cmd_clients(msg_buffer *buf, const client_t *client)
         add_char(buf, '\n');
         client = client->next;
     }
+
+    list_end(buf);
 }
 
 /* ==== players ==== */
@@ -453,11 +491,11 @@ static void players_t_entry(msg_buffer *buf, const player_t *player)
     add_char(buf, ' ');
     money(buf, player->money);
     add_char(buf, ' ');
-    number(buf, player->raw);
+    number_explicit(buf, player->raw);
     add_char(buf, ' ');
-    number(buf, player->prod);
+    number_explicit(buf, player->prod);
     add_char(buf, ' ');
-    number(buf, player->fact);
+    number_explicit(buf, player->fact);
     add_char(buf, ' ');
     is(buf, player->turn, "turn");
     add_char(buf, '\n');
@@ -465,29 +503,29 @@ static void players_t_entry(msg_buffer *buf, const player_t *player)
 
 void msg_cmd_players(msg_buffer *buf, const game_t *game)
 {
-    static const char header[] =
+    static const char header_text[] =
         "Nickname        Money        Raw       Prod       Fact M.turn?";
 
     uint i;
 
     ok(buf);
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     for (i = 0; i < game->players_count; ++i) {
         players_t_entry(buf, game->players[i]);
     }
+
+    list_end(buf);
 }
 
 /* ==== requests ==== */
 
 static void req_t1(msg_buffer *buf, const player_t *player)
 {
-    static const char header[] =
+    static const char header_text[] =
 "   Raw     Raw cost     Prod    Prod cost  To make    Make cost";
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     positive(buf, player->req_raw);
     add_char(buf, ' ');
@@ -507,11 +545,10 @@ static void req_t1(msg_buffer *buf, const player_t *player)
 
 static void req_t2(msg_buffer *buf, const player_t *player)
 {
-    static const char header[] =
+    static const char header_text[] =
 "To build   Fact pay 1   Fact pay 2  Raw expense Prod expense Fact expense";
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     positive(buf, player->req_build);
     add_char(buf, ' ');
@@ -539,21 +576,20 @@ void msg_cmd_requests(msg_buffer *buf, const player_t *player)
 
 static void market_t(msg_buffer *buf, const game_t *game)
 {
-    static const char header[] = 
+    static const char header_text[] =
 "   Month   Level        Raw     Raw cost       Prod    Prod cost";
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
-    explicit_number(buf, game->month);
+    number_explicit(buf, game->month);
     add_char(buf, ' ');
-    number_short(buf, game->level);
+    number_explicit_short(buf, game->level + 1); /* level field is index */
     add_char(buf, ' ');
-    number(buf, market_raw(game->level, game->players_count));
+    number_explicit(buf, market_raw(game->level, game->players_count));
     add_char(buf, ' ');
     money(buf, market_raw_cost(game->level));
     add_char(buf, ' ');
-    number(buf, market_prod(game->level, game->players_count));
+    number_explicit(buf, market_prod(game->level, game->players_count));
     add_char(buf, ' ');
     money(buf, market_prod_cost(game->level));
     add_char(buf, '\n');
@@ -561,10 +597,10 @@ static void market_t(msg_buffer *buf, const game_t *game)
 
 static void next_lvl_t(msg_buffer *buf, const game_t *game)
 {
-    static const char header[] = "Levels probability";
+    static const char header_text[] = "Levels probability";
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
+
     procent(buf, market_level_probability(game->level, 0));
     add_char(buf, ' ');
     procent(buf, market_level_probability(game->level, 1));
@@ -586,29 +622,7 @@ void msg_cmd_market(msg_buffer *buf, const game_t *game)
 
 /* ===== build, make, buy, sell, turn, join ==== */
 
-void msg_cmd_ok(msg_buffer *buf, const char *str)
-{
-    ok(buf);
-    add_str(buf, str);
-    add_char(buf, '\n');
-}
-
-void msg_cmd_fail(msg_buffer *buf, const char *reason)
-{
-    fail(buf);
-    add_str(buf, reason);
-    add_char(buf, '\n');
-}
-
-void msg_cmd_wrong(msg_buffer *buf)
-{
-    static const char error_text[] =
-        "Wrong command or argument(s). See \"help\".";
-
-    fail(buf);
-    add_str(buf, error_text);
-    add_char(buf, '\n');
-}
+/* See common commands stuff upper in this file and PROTO file. */
 
 /* ==== Asynchronous messages ==== */
 
@@ -620,6 +634,8 @@ static void players_list(msg_buffer *buf, const game_t *game)
         nickname(buf, game->players[i]->nick);
         add_char(buf, '\n');
     }
+
+    list_end(buf);
 }
 
 static void month_over_t1_entry(msg_buffer *buf, const player_t *player)
@@ -678,32 +694,34 @@ static void month_over_t3_entry(msg_buffer *buf, const player_t *player)
 
 static void month_over_t1(msg_buffer *buf, const game_t *game)
 {
-    static const char header[] =
+    static const char header_text[] =
         "  Nickname      Raw     Raw cost     Prod    Prod cost";
 
     uint i;
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     for (i = 0; i < game->players_count; ++i) {
         month_over_t1_entry(buf, game->players[i]);
     }
+
+    list_end(buf);
 }
 
 static void month_over_t2(msg_buffer *buf, const game_t *game)
 {
-    static const char header[] =
+    static const char header_text[] =
 "  Nickname  To make    Make cost    Build   Fact pay 1   Fact pay 2";
 
     uint i;
 
-    add_str(buf, header);
-    add_char(buf, '\n');
+    header(buf, header_text);
 
     for (i = 0; i < game->players_count; ++i) {
         month_over_t2_entry(buf, game->players[i]);
     }
+
+    list_end(buf);
 }
 
 static void month_over_t3(msg_buffer *buf, const game_t *game)
@@ -719,11 +737,14 @@ static void month_over_t3(msg_buffer *buf, const game_t *game)
     for (i = 0; i < game->players_count; ++i) {
         month_over_t3_entry(buf, game->players[i]);
     }
+
+    list_end(buf);
 }
 
 void msg_early_disconnecting(msg_buffer *buf, const char *reason)
 {
     static const char text[] = "Disconnecting: ";
+
     prefix_early_disconnecting(buf);
 
     add_str(buf, text);

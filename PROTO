@@ -4,31 +4,34 @@
 * '\n' if present), but it contain least count of symbols, therefore it
 * completed with spaces from the left.
 
-* 'something' is one token. Parser must know length of each table cell.
+* Parser must know length of each table cell.
 
-* 'nick' is one word (token, lexeme), length is 10 symbols, not contain ':'.
+* 'something' is one lexeme (token, word).
 
-* [ SOMETHING] mean that SOMETHING is optional, can be presented,
-* can be not.
+* NICK is lexeme, length is 10 symbols, not contain ':'.
+
+* [ SOMETHING ] mean that SOMETHING is optional, can be presented,
+* can be not (expanded with spaces).
+
+* { SOMETHING }{n} mean that SOMETHING repeated n times.
 
 * { SOMETHING }{n-m} mean that SOMETHING repeated from n to m times.
 
-* NUMBER(NN) is number, which string representation has length NN.
-
-* 'number' is unsigned 32-bit number, length: 10.
+* NUMBER is unsigned 32-bit number, length: 10.
 
 * HEADER(NN) and TEXT(NN) cannot contain '\n', TEXT(NN) cannot contain ':'.
-* This contain maximum NN symbols (but can be least) and be moved to (80-NN)
-* symbols right. NN is in range [10; 80].
+* This contain maximum NN symbols (but can be least). NN is in range [10; 80].
 
-* Note: MULTILINE, TEXT, HEADER and implemented via 'add_str' function.  We not
-* make static or runtime checks for length or other restriction, simply make
-* messages conforming them (and make checks for nick before accept it).
+* Note: TEXT implemented via 'add_str' function. We not make static or runtime
+* checks for length or other restriction, simply make messages conforming them
+* (and make checks for nick before accept it).
 
-* MULTILINE_TEXT cannot contain "\n----\n". First line must contain maximum 78
-* symbols, follow lines must contain maximum 80 symbols (without '\n').
+* MULTILINE_TEXT cannot contain MULTILINE_TEXT_END not in end. First line must
+* contain maximum 78 symbols, follow lines must contain maximum 80 symbols
+* (without '\n').
 
-* Branch eps mean that expecting spaces, which amount equal to message length.
+* Objects with name suffix MSG_ is messages. Server output is such messages
+* stream.
 
 ==== Commands list ====
 
@@ -47,23 +50,51 @@
 
 ==== Common message objects ====
 
-EXPLICIT_NUMBER -> "         0" | 'number'
+SPACES -> { " " }{0-infty}
+NUMBER -> { [0-9] }{1-10}
+NUMBER_SHORT -> { [0-9] }{1-7}
 
-IS(str)  -> str | eps
+#if 0
+NUMBER_OR_SPACES       -> SPACES [ NUMBER ]
+// Length: 10.
+NUMBER_OR_SPACES_SHORT -> SPACES [ NUMBER_SHORT ]
+// Length: 7.
+#endif
 
-POSITIVE -> '+' NUMBER(7) | eps
-NEGATIVE -> '-' NUMBER(7) | eps
+NUMBER_EXPLICIT       -> SPACES NUMBER
+// Length: 10.
+NUMBER_EXPLICIT_SHORT -> SPACES NUMBER_SHORT
+// Length: 7.
+
+IS(str)  -> str | SPACES
+
+POSITIVE -> SPACES [ '+' NUMBER_SHORT ]
+NEGATIVE -> SPACES [ '-' NUMBER_SHORT ]
 // Length: 8.
 
-RISE    -> '+' '$' 'number' | eps
-EXPENSE -> '-' '$' 'number' | eps
+RISE    -> SPACES [ '+' '$' NUMBER ]
+EXPENSE -> SPACES [ '-' '$' NUMBER ]
 // Length: 12.
 
-MONEY   -> '$' 'number' | EXPENSE | eps
+MONEY   -> SPACES (('$' NUMBER) | ('-' '$' NUMBER))
 // Length: 12.
 
-PROCENT -> ['digit'] 'digit' '%' | eps
+NUMBER_SMALL -> (' ' | [1-9]){2} [0-9]
 // Length: 3.
+
+PROCENT ->  NUMBER_SMALL '%'
+// Length: 4.
+
+MULTILINE_TEXT_END  -> "\n----\n"
+
+MULTILINE_TEXT(str) -> str MULTILINE_TEXT_END
+
+HEADER(str) -> str '\n'
+
+LIST_END    -> "----\n"
+
+NICKNAME(str) -> SPACES str
+// Length: 10.
 
 ==== Prefixes ====
 
@@ -83,14 +114,22 @@ PREFIX_INFO          -> 'i' ' '
 
 ==== First message ====
 
-PREFIX_PROTO TEXT(69) ':' ' ' NUMBER(7) '\n'
+PREFIX_PROTO TEXT(69) ':' ' ' NUMBER '\n'
 // Number is protocol version.
 
 ==== Prompt ====
 
-PROMPT -> TIME '$' ' '
-TIME -> '[' 'digit' 'digit' ':' 'digit' 'digit' ':' 'digit' 'digit'
-    ']' ' ' | eps
+TIME -> '[' [0-9]{2} ':' [0-9]{2} ':' [0-9]{2} ']' | SPACES
+// Length: 10.
+
+MSG_PROMPT -> TIME " $ "
+// Length: 13.
+
+==== Common commands stuff ====
+
+MSG_CMD_OK    -> OK   TEXT(78) '\n'
+MSG_CMD_FAIL  -> FAIL TEXT(78) '\n'
+MSG_CMD_WRONG -> FAIL TEXT(78) '\n'
 
 ==== Command responces (help, nick, clients) ====
 
@@ -99,23 +138,24 @@ TIME -> '[' 'digit' 'digit' ':' 'digit' 'digit' ':' 'digit' 'digit'
 0000000000 000000
 
 $ help
-OK   MULTILINE_TEXT "\n----\n"
+MSG_CMD_HELP_0 -> OK MULTILINE_TEXT
 
 $ help CMD_NAME
-OK   MULTILINE_TEXT "\n----\n"
-FAIL TEXT(78) '\n'
+MSG_CMD_HELP_1 -> OK MULTILINE_TEXT
+MSG_CMD_FAIL
 // Fail conditions: unknown command.
 
 $ nick
-OK   TEXT(66) ':' ' ' 'nick' '\n'
+MSG_CMD_NICK_0 -> OK TEXT(66) ':' ' ' NICK '\n'
 
-$ nick 'nick'
-OK   TEXT(78) '\n'
-FAIL TEXT(78) '\n'
+$ nick NICK
+MSG_CMD_OK
+MSG_CMD_FAIL
 // Fail conditions: already exists, contain forbidden symbols or too long.
 
 $ clients
-OK   HEADER(78) '\n' { 'nick' ' ' CLIENT_STATE '\n' }{0-infty}
+MSG_CMD_CLIENTS -> OK HEADER(78) { NICK ' ' CLIENT_STATE '\n' }{0-infty}
+    LIST_END
 // Columns: nick, state.
 
 CLIENT_STATE -> "       " |
@@ -130,12 +170,12 @@ CLIENT_STATE -> "       " |
 0000000000 0$0000000000 0000000000 0000000000 0000000000 0000
 
 $ players
-OK   HEADER(78) '\n' { PLAYERS_T_ENTRY }{1-infty}
-FAIL TEXT(78)
+MSG_CMD_PLAYERS -> OK HEADER(78) { PLAYERS_T_ENTRY }{1-infty} LIST_END
+MSG_CMD_FAIL
 // Fail conditions: game is over.
 
-PLAYERS_T_ENTRY -> 'nick' ' ' MONEY ' ' 'number' ' ' 'number'
-    ' ' 'number' ' ' IS("turn") '\n'
+PLAYERS_T_ENTRY -> NICK ' ' MONEY ' ' NUMBER_EXPLICIT ' ' NUMBER_EXPLICIT
+    ' ' NUMBER_EXPLICIT ' ' IS("turn") '\n'
 // Columns: nick, money, raw, prod, fact, is turned.
 // Length: 61 (10+12+3*10+4+5).
 
@@ -150,8 +190,8 @@ To build   Fact pay 1   Fact pay 2  Raw expense Prod expense Fact expense
 +0000000 -$0000000000 -$0000000000 -$0000000000 -$0000000000 -$0000000000
 
 $ requests
-OK   REQ_T1 REQ_T2
-FAIL TEXT(78)
+MSG_CMD_REQUESTS -> OK REQ_T1 REQ_T2
+MSG_CMD_FAIL
 // Fail conditions: game is over.
 
 REQ_T1 -> POSITIVE ' ' EXPENSE ' ' NEGATIVE ' ' RISE
@@ -172,15 +212,15 @@ REQ_T2 -> POSITIVE ' ' EXPENSE ' ' EXPENSE ' ' EXPENSE
 
 // NEXT_LVL_T
 Levels probability
-00% 00% 00% 00% 00%
+000% 000% 000% 000% 000%
 
 $ market
-OK   MARKET_T NEXT_LVL_T
-FAIL TEXT(78) '\n'
+MSG_CMD_MARKET -> OK MARKET_T NEXT_LVL_T
+MSG_CMD_FAIL
 // Fail conditions: game is over.
 
-MARKET_T -> HEADER(78) '\n' EXPLICIT_NUMBER ' ' NUMBER(7) ' ' 'number'
-    ' ' MONEY ' ' 'number' ' ' MONEY '\n'
+MARKET_T -> HEADER(78) NUMBER_EXPLICIT ' ' NUMBER_EXPLICIT_SHORT
+    ' ' NUMBER_EXPLICIT ' ' MONEY ' ' NUMBER_EXPLICIT ' ' MONEY '\n'
 // Columns: month, level, raw, raw_cost, prod, prod_cost.
 // Length: 66.
 
@@ -191,19 +231,19 @@ NEXT_LVL_T -> HEADER(80) '\n' PROCENT ' ' PROCENT ' ' PROCENT ' ' PROCENT
 
 ==== Command responces (build, make, buy, sell, turn, join) ====
 
-$ build 'number'          // count
-$ make  'number'          // count
-$ buy   'number' 'number' // count and cost
-$ sell  'number' 'number' // count and cost
+$ build NUMBER        // count
+$ make  NUMBER        // count
+$ buy   NUMBER NUMBER // count and cost
+$ sell  NUMBER NUMBER // count and cost
 $ turn
-OK   TEXT(78) '\n'
-FAIL TEXT(78) '\n'
+MSG_CMD_OK
+MSG_CMD_FAIL
 // Fail conditions: game is over, not player, already closed month,
 // market restriction or low player resources.
 
 $ join
-OK   TEXT(78) '\n'
-FAIL TEXT(78) '\n'
+MSG_CMD_OK
+MSG_CMD_FAIL
 // Fail conditions: already make join request, currently in game (in round).
 
 ==== Asynchronous messages ====
@@ -247,28 +287,28 @@ ROUND_NEW     -> PREFIX_ROUND_NEW     TEXT(78) '\n' PLAYERS_LIST
 MONTH_OVER    -> PREFIX_MONTH_OVER    TEXT(78) '\n'
     MONTH_OVER_T1 MONTH_OVER_T2 MONTH_OVER_T
 ROUND_OVER    -> PREFIX_ROUND_OVER    TEXT(78) '\n' PLAYERS_LIST
-NICK_CHANGED  -> PREFIX_NICK_CHANGED  'nick'   " -> " 'nick' '\n'
-DISCONNECTING -> PREFIX_DISCONNECTING 'nick'   ' '  TEXT(67) '\n'
+NICK_CHANGED  -> PREFIX_NICK_CHANGED  NICK     " -> " NICK '\n'
+DISCONNECTING -> PREFIX_DISCONNECTING NICK     ' '  TEXT(67) '\n'
 INFO          -> PREFIX_INFO          TEXT(78) '\n'
 
-PLAYERS_LIST -> { 'nick' '\n' }{1-infty}
+PLAYERS_LIST -> { NICK '\n' }{1-infty} LIST_END
 // Length: 10.
 
-MONTH_OVER_T1 -> HEADER(80) '\n' { MONTH_OVER_T1_ENTRY }{1-infty}
-MONTH_OVER_T2 -> HEADER(80) '\n' { MONTH_OVER_T2_ENTRY }{1-infty}
-MONTH_OVER_T3 -> HEADER(80) '\n' { MONTH_OVER_T3_ENTRY }{1-infty}
+MONTH_OVER_T1 -> HEADER(80) '\n' { MONTH_OVER_T1_ENTRY }{1-infty} LIST_END
+MONTH_OVER_T2 -> HEADER(80) '\n' { MONTH_OVER_T2_ENTRY }{1-infty} LIST_END
+MONTH_OVER_T3 -> HEADER(80) '\n' { MONTH_OVER_T3_ENTRY }{1-infty} LIST_END
 
-MONTH_OVER_T1_ENTRY -> 'nick' ' '  POSITIVE ' ' EXPENSE ' ' NEGATIVE
+MONTH_OVER_T1_ENTRY -> NICK ' '  POSITIVE ' ' EXPENSE ' ' NEGATIVE
     ' ' RISE '\n'
 // Columns: nick, raw, raw cost, prod, prod cost.
 // Length: 54 (10+8*2+12*2+4).
 
-MONTH_OVER_T2_ENTRY -> 'nick' ' ' POSITIVE ' ' EXPENSE ' ' POSITIVE
+MONTH_OVER_T2_ENTRY -> NICK ' ' POSITIVE ' ' EXPENSE ' ' POSITIVE
     ' ' EXPENSE ' ' EXPENSE '\n'
 // Columns: nick, make, make cost, fact, pay 1, pay 2.
 // Length: 67 (10+8*2+12*3+5).
 
-MONTH_OVER_T3_ENTRY -> 'nick' ' ' EXPENSE ' ' EXPENSE ' ' EXPENSE
+MONTH_OVER_T3_ENTRY -> NICK ' ' EXPENSE ' ' EXPENSE ' ' EXPENSE
     ' ' MONEY ' ' IS("bankrupt") '\n'
 // Columns: nick, raw, prod, fact, money, resolution.
 // Length: 70 (10+12*4+8+4).

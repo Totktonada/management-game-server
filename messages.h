@@ -8,15 +8,21 @@
 
 void msg_first_message(msg_buffer *buf);
 
+/* Prompt format: "[%H:%M:%S] $ ". See 'update_time_buf'
+ * in utils.[ch] for more information. */
 void msg_prompt(msg_buffer *buf);
+
+void msg_cmd_ok(msg_buffer *buf, const char* str);
+
+void msg_cmd_fail(msg_buffer *buf, const char* reason);
+
+void msg_cmd_wrong(msg_buffer *buf);
 
 void msg_cmd_help_0(msg_buffer *buf);
 
 void msg_cmd_help_1(msg_buffer *buf, command_kind cmd);
 
 void msg_cmd_nick_0(msg_buffer *buf, const char *nick);
-
-void msg_cmd_nick_1(msg_buffer *buf);
 
 void msg_cmd_clients(msg_buffer *buf, const client_t *client);
 
@@ -25,12 +31,6 @@ void msg_cmd_players(msg_buffer *buf, const game_t *game);
 void msg_cmd_requests(msg_buffer *buf, const player_t *player);
 
 void msg_cmd_market(msg_buffer *buf, const game_t *game);
-
-void msg_cmd_ok(msg_buffer *buf, const char* str);
-
-void msg_cmd_fail(msg_buffer *buf, const char* reason);
-
-void msg_cmd_wrong(msg_buffer *buf);
 
 void msg_early_disconnecting(msg_buffer *buf, const char *reason);
 
