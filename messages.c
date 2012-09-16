@@ -780,16 +780,41 @@ void msg_month_over(msg_buffer *buf, const game_t *game)
     month_over_t3(buf, game);
 }
 
-void msg_round_over(msg_buffer *buf, const game_t *game)
+
+/* Length: 10. */
+static void number_or_winner(msg_buffer *buf, uint month,
+    uint is_winner)
+{
+    if (is_winner) {
+        add_str(buf, "   Winner!");
+    } else {
+        number_explicit(buf, month);
+    }
+}
+
+/* Length: 21. */
+static void players_month_list(msg_buffer *buf, const bankrupt_t *bankrupt)
+{
+    for ( ; bankrupt != NULL; bankrupt = bankrupt->next) {
+        nickname(buf, bankrupt->nick);
+        add_char(buf, ' ');
+        number_or_winner(buf, bankrupt->month, bankrupt->is_winner);
+        add_char(buf, '\n');
+    }
+
+    list_end(buf);
+}
+
+void msg_round_over(msg_buffer *buf, const bankrupt_t *first_bankrupt)
 {
     static const char text_ok[] =
-        "Round over! Winners:";
+        "Round over! Players and his month of bankrupting:";
 
     prefix_round_over(buf);
     add_str(buf, text_ok);
     add_char(buf, '\n');
 
-    players_list(buf, game);
+    players_month_list(buf, first_bankrupt);
 }
 
 void msg_nick_changed(msg_buffer *buf, const char *old_nick,

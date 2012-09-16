@@ -38,7 +38,7 @@ void msg_round_new(msg_buffer *buf, const game_t *game);
 
 void msg_month_over(msg_buffer *buf, const game_t *game);
 
-void msg_round_over(msg_buffer *buf, const game_t *game);
+void msg_round_over(msg_buffer *buf, const bankrupt_t *bankrupt);
 
 void msg_nick_changed(msg_buffer *buf, const char *old_nick,
     const char *new_nick);

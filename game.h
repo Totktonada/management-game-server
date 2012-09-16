@@ -40,15 +40,30 @@ typedef struct player_t {
     uint turn:1;
 } player_t;
 
+typedef struct bankrupt_t {
+    struct bankrupt_t *next;
+    char *nick;
+    uint month; /* month of bankrupting */
+    uint is_winner;
+} bankrupt_t;
+
 typedef struct game_t {
     player_t **players; /* Is not NULL. */
     uint players_count;
     uint month;
     uint level; /* [0-4] */
+    bankrupt_t *first_bankrupt;
 } game_t;
 
 game_t *new_game(player_t **players, uint players_count);
 
 player_t *new_player(const char *nick);
+
+void add_to_bankrupts(bankrupt_t **first_bankrupt, const char *nick,
+    uint month);
+
+void add_winner_to_bankrupts(game_t *game);
+
+void free_bankrupts(bankrupt_t *bankrupt);
 
 #endif /* GAME_H_SENTRY */

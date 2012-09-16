@@ -72,6 +72,8 @@ void player_to_client(game_t *game, client_t *client)
 
     /* (i == game->players_count), index of last entry in array. */
     game->players[i] = NULL;
+
+    add_to_bankrupts(&(game->first_bankrupt), client->nick, game->month);
 }
 
 void bankrupts_to_clients(server_t *server)

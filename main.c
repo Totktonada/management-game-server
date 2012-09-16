@@ -87,12 +87,13 @@ static void game_over(server_t *server)
 {
     client_t *cur_c;
 
-    msg_round_over_clients(server);
-
+    /* Flush game */
     free(server->game->players);
+    free_bankrupts(server->game->first_bankrupt);
     free(server->game);
     server->game = NULL;
 
+    /* Flush players array entries and NULLed pointers to it. */
     for (cur_c = server->first_client;
         cur_c != NULL;
         cur_c = cur_c->next)
@@ -488,6 +489,12 @@ static void maybe_decreased_callback(server_t *server,
     } else if (server->state == ST_SERVER_GAME
         && server->game->players_count <= 1)
     {
+        /* Add winner to bankrupts for clients notifications. */
+        if (server->game->players_count == 1) {
+            add_winner_to_bankrupts(server->game);
+        }
+
+        msg_round_over_clients(server);
         game_over(server);
 
         if (server->clients_count <= 1) {
@@ -563,8 +570,8 @@ int main(int argc, const char **argv)
         if (ready_to_new_month(server.game)) {
             end_month(server.game);
             msg_month_over_clients(&server);
-            new_month(server.game);
             bankrupts_to_clients(&server);
+            new_month(server.game);
         }
 
         maybe_decreased_callback(&server, &expire, &arguments);

@@ -8,7 +8,6 @@ void msg_round_new_clients(server_t *server);
 
 void msg_month_over_clients(server_t *server);
 
-
 void msg_round_over_clients(server_t *server);
 
 void msg_nick_changed_clients(server_t *server, const char *old_nick,

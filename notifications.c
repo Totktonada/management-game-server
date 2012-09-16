@@ -37,7 +37,7 @@ void msg_round_over_clients(server_t *server)
         cur_c != NULL;
         cur_c = cur_c->next)
     {
-        msg_round_over(&(cur_c->write_buf), server->game);
+        msg_round_over(&(cur_c->write_buf), server->game->first_bankrupt);
     }
 }
 
